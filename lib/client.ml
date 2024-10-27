@@ -5,7 +5,11 @@ let dot scale : image =
   I.uchar A.(bg black ++ fg (rgb ~r:scale ~g:0 ~b:0)) (Uchar.of_int 0x25cf) 1 1
 ;;
 
-let background : image = I.uchar A.(bg black) (Uchar.of_char ' ') 1 1
+let hidden_background : image =
+  I.uchar A.(fg white ++ bg lightblack) (Uchar.of_int 0x2591) 1 1
+;;
+
+let visible_background : image = I.uchar A.(bg black) (Uchar.of_char ' ') 1 1
 
 module Set = Set.Make (struct
     type t = int * int
@@ -15,9 +19,13 @@ module Set = Set.Make (struct
 
 let terminal = Term.create ()
 
+let fog_env distance =
+  if distance > Game.view_radius_sq then hidden_background else visible_background
+;;
+
 let fog distance =
   if distance > Game.view_radius_sq
-  then background
+  then hidden_background
   else (
     let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
     dot (int_of_float (5.0 *. ratio *. ratio)))
@@ -32,7 +40,9 @@ let render ~me terminal Game.{ width; height; entities } =
   let entities_set = Set.of_list entities in
   let image =
     I.tabulate width height
-    @@ fun x y -> if Set.mem (x, y) entities_set then fog (dist (x, y) me) else background
+    @@ fun x y ->
+    let distance = dist (x, y) me in
+    if Set.mem (x, y) entities_set then fog distance else fog_env distance
   in
   Term.image terminal image
 ;;

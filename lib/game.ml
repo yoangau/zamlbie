@@ -18,7 +18,7 @@ let get_move_delta = function
   | `Right -> (1, 0)
 ;;
 
-let view_radius_sq = 20 * 20
+let view_radius_sq = 5 * 5
 
 let move { entities; width; height } entity_index move =
   let dx, dy = get_move_delta move in

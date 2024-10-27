@@ -1,2 +1,3 @@
 (library
- (name zamlbie))
+ (name zamlbie)
+ (libraries notty notty.unix))

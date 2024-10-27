@@ -1,5 +1,14 @@
+type entity_type = [ `Player ]
+
+type entity =
+  { entity_type : entity_type;
+    id : int;
+    x : int;
+    y : int
+  }
+
 type game =
-  { entities : (int * int) list;
+  { entities : entity list;
     width : int;
     height : int
   }
@@ -18,20 +27,38 @@ let get_move_delta = function
   | `Right -> (1, 0)
 ;;
 
+let default_entity = { id = 0; entity_type = `Player; x = 0; y = 0 }
 let view_radius_sq = 5 * 5
+let is_entity a b = a.id = b.id && a.entity_type = b.entity_type
 
-let move { entities; width; height } entity_index move =
-  let dx, dy = get_move_delta move in
-  let x, y = List.nth entities entity_index in
-  let new_entity =
-    ( Base.Int.clamp_exn (x + dx) ~min:0 ~max:(width - 1),
-      Base.Int.clamp_exn (y + dy) ~min:0 ~max:(height - 1) )
-  in
-  { width;
-    height;
+let find_entity { entities; _ } id entity_type =
+  List.find_opt (is_entity { default_entity with id; entity_type }) entities
+;;
+
+let update_entity game new_entity =
+  { game with
     entities =
-      List.mapi (fun i entity -> if i = entity_index then new_entity else entity) entities
+      List.map
+        (fun entity -> if is_entity entity new_entity then new_entity else entity)
+        game.entities
   }
 ;;
 
-let init width height = { entities = [ (0, 0); (width - 1, height - 1) ]; width; height }
+let move ~game ~id ~entity_type ~move =
+  let ( let* ) = Base.Option.( >>= ) in
+  let* entity = find_entity game id entity_type in
+  let dx, dy = get_move_delta move in
+  let nx, ny =
+    ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.width - 1),
+      Base.Int.clamp_exn (entity.y + dy) ~min:0 ~max:(game.height - 1) )
+  in
+  Some (update_entity game { entity with x = nx; y = ny })
+;;
+
+let init width height =
+  { entities =
+      [ default_entity; { default_entity with id = 1; x = width - 1; y = height - 1 } ];
+    width;
+    height
+  }
+;;

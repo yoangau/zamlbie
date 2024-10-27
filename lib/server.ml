@@ -4,8 +4,8 @@ let games = Hashtbl.create (module Int)
 let next_id = ref 0
 
 let get_agent_move Game.{ entities; _ } =
-  let px, py = List.nth_exn entities 0 in
-  let ax, ay = List.nth_exn entities 1 in
+  let Game.{ x = px; y = py; _ } = List.nth_exn entities 0 in
+  let Game.{ x = ax; y = ay; _ } = List.nth_exn entities 1 in
   let x = px - ax in
   let y = py - ay in
   if (x * x) + (y * y) > Game.view_radius_sq
@@ -30,14 +30,14 @@ let create_game width height =
   new_game
 ;;
 
-let on_player_input ~id ~player move =
-  match Hashtbl.find games id with
-  | Some game ->
-    let agent_move = get_agent_move game in
-    let game = Game.move game player move in
-    let game = Game.move game 1 agent_move in
-    Hashtbl.set games ~key:id ~data:game
-  | None -> ()
+let on_player_input ~game_id ~player_id move =
+  let ( let* ) = Option.( >>= ) in
+  let* game = Hashtbl.find games game_id in
+  let agent_move = get_agent_move game in
+  let* game = Game.move ~game ~id:player_id ~entity_type:`Player ~move in
+  let* game = Game.move ~game ~id:1 ~entity_type:`Player ~move:agent_move in
+  Hashtbl.set games ~key:game_id ~data:game;
+  Some ()
 ;;
 
-let on_game_update ~id = Hashtbl.find_exn games id
+let on_game_update ~game_id = Hashtbl.find_exn games game_id

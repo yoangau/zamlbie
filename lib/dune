@@ -1,3 +1,18 @@
+(rule
+ (targets game_t.ml game_t.mli)
+ (deps game.atd)
+ (mode fallback)
+ (action
+  (run atdgen -t %{deps})))
+
+(rule
+ (targets game_j.ml game_j.mli)
+ (deps game.atd)
+ (mode fallback)
+ (action
+  (run atdgen -j %{deps})))
+
 (library
  (name zamlbie)
- (libraries base notty notty.unix))
+ (modules server client game game_j game_t)
+ (libraries base notty notty.unix lwt.unix dream hyper atdgen))

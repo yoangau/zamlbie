@@ -1,4 +1,9 @@
 (executable
- (public_name zamlbie)
- (name main)
+ (public_name client)
+ (name main_client)
+ (libraries zamlbie))
+
+(executable
+ (public_name server)
+ (name main_server)
  (libraries zamlbie))

@@ -24,7 +24,11 @@
    (>= 5.2.0))
   dune
   notty
-  base)
+  base
+  dream
+  hyper
+  atdgen
+  lwt)
  (tags (gamedev)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

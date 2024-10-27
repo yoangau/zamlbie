@@ -1,24 +1,5 @@
-type entity_type = [ `Player ]
-
-type entity =
-  { entity_type : entity_type;
-    id : int;
-    x : int;
-    y : int
-  }
-
-type game =
-  { entities : entity list;
-    width : int;
-    height : int
-  }
-
-type move =
-  [ `Up
-  | `Down
-  | `Left
-  | `Right
-  ]
+include Game_t
+module Serializer = Game_j
 
 let get_move_delta = function
   | `Up -> (0, -1)

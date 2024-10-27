@@ -23,7 +23,7 @@ module Map = Map.Make (struct
     let compare = Stdlib.compare
   end)
 
-let terminal = Term.create ()
+(* let terminal = Term.create () *)
 
 let fog_env distance_sq =
   let view_radius_sq = float_of_int Game.view_radius_sq in
@@ -76,15 +76,27 @@ let get_player_input terminal =
   | _ -> None
 ;;
 
+let run () =
+  let ( let* ) = Lwt.bind in
+  let response =
+    Lwt_main.run
+      (let* maybe_websocket = Hyper.websocket "ws://127.0.0.1:8080/join/0" in
+       let websocket = Result.get_ok maybe_websocket in
+       let* () = Hyper.send websocket "Hello" in
+       Hyper.receive websocket)
+  in
+  print_endline (Option.get response)
+;;
+
 let rec main_loop terminal game game_id =
   Unix.sleepf 0.016;
   match get_player_input terminal with
   | Some Exit -> ()
-  | Some (Move direction) ->
-    Server.on_player_input ~game_id ~player_id:0 direction |> ignore;
+  | Some (Move _direction) ->
+    (* Server.on_player_input ~game_id ~player_id:0 direction |> ignore; *)
     let updated_game = Server.on_game_update ~game_id in
-    render ~me:(List.hd updated_game.entities) terminal updated_game;
-    main_loop terminal updated_game game_id
+    render ~me:(List.hd updated_game.state.entities) terminal updated_game.state;
+    main_loop terminal updated_game.state game_id
   | _ ->
     render ~me:(List.hd game.entities) terminal game;
     main_loop terminal game game_id

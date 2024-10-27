@@ -1,0 +1,4 @@
+(executable
+ (public_name zamlbie)
+ (name main)
+ (libraries zamlbie))

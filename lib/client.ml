@@ -23,20 +23,12 @@ let render terminal Game.{ width; height; entities } =
 
 type input =
   | Exit
-  | Move of (int * int)
+  | Move of Game.move
 
 let get_player_input terminal =
   match Term.event terminal with
   | `End | `Key (`Escape, []) -> Some Exit
-  | `Key (`Arrow arrow, []) ->
-    let dir =
-      match arrow with
-      | `Up -> (0, -1)
-      | `Down -> (0, 1)
-      | `Left -> (-1, 0)
-      | `Right -> (1, 0)
-    in
-    Some (Move dir)
+  | `Key (`Arrow arrow, []) -> Some (Move arrow)
   | _ -> None
 ;;
 
@@ -45,7 +37,7 @@ let rec main_loop terminal game id =
   match get_player_input terminal with
   | Some Exit -> ()
   | Some (Move direction) ->
-    Server.on_player_input ~id ~player:0 ~direction;
+    Server.on_player_input ~id ~player:0 direction;
     let updated_game = Server.on_game_update ~id in
     render terminal updated_game;
     main_loop terminal updated_game id

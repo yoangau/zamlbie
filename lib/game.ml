@@ -4,7 +4,22 @@ type game =
     height : int
   }
 
-let move { entities; width; height } entity_index (dx, dy) =
+type move =
+  [ `Up
+  | `Down
+  | `Left
+  | `Right
+  ]
+
+let get_move_delta = function
+  | `Up -> (0, -1)
+  | `Down -> (0, 1)
+  | `Left -> (-1, 0)
+  | `Right -> (1, 0)
+;;
+
+let move { entities; width; height } entity_index move =
+  let dx, dy = get_move_delta move in
   let x, y = List.nth entities entity_index in
   let new_entity =
     ( Base.Int.clamp_exn (x + dx) ~min:0 ~max:(width - 1),

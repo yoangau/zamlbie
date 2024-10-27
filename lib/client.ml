@@ -1,8 +1,11 @@
 open Notty
 open Notty_unix
 
-let dot : image = I.uchar A.(bg lightblue ++ fg lightred) (Uchar.of_int 0x25cf) 1 1
-let background : image = I.uchar A.(bg lightblue) (Uchar.of_char ' ') 1 1
+let dot scale : image =
+  I.uchar A.(bg black ++ fg (rgb ~r:scale ~g:0 ~b:0)) (Uchar.of_int 0x25cf) 1 1
+;;
+
+let background : image = I.uchar A.(bg black) (Uchar.of_char ' ') 1 1
 
 module Set = Set.Make (struct
     type t = int * int
@@ -12,11 +15,24 @@ module Set = Set.Make (struct
 
 let terminal = Term.create ()
 
-let render terminal Game.{ width; height; entities } =
+let fog distance =
+  if distance > Game.view_radius_sq
+  then background
+  else (
+    let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
+    dot (int_of_float (5.0 *. ratio *. ratio)))
+;;
+
+let dist (ax, ay) (bx, by) =
+  let dx, dy = (bx - ax, by - ay) in
+  (dx * dx) + (dy * dy)
+;;
+
+let render ~me terminal Game.{ width; height; entities } =
   let entities_set = Set.of_list entities in
   let image =
     I.tabulate width height
-    @@ fun x y -> if Set.mem (x, y) entities_set then dot else background
+    @@ fun x y -> if Set.mem (x, y) entities_set then fog (dist (x, y) me) else background
   in
   Term.image terminal image
 ;;
@@ -39,9 +55,9 @@ let rec main_loop terminal game id =
   | Some (Move direction) ->
     Server.on_player_input ~id ~player:0 direction;
     let updated_game = Server.on_game_update ~id in
-    render terminal updated_game;
+    render ~me:(List.hd updated_game.entities) terminal updated_game;
     main_loop terminal updated_game id
   | _ ->
-    render terminal game;
+    render ~me:(List.hd game.entities) terminal game;
     main_loop terminal game id
 ;;

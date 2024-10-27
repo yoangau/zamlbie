@@ -8,7 +8,15 @@ let get_agent_move Game.{ entities; _ } =
   let ax, ay = List.nth_exn entities 1 in
   let x = px - ax in
   let y = py - ay in
-  if Int.abs x > Int.abs y
+  if (x * x) + (y * y) > Game.view_radius_sq
+  then (
+    match Random.int 4 with
+    | 0 -> `Up
+    | 1 -> `Down
+    | 2 -> `Left
+    | 3 -> `Right
+    | _ -> assert false)
+  else if Int.abs x > Int.abs y
   then if x >= 0 then `Right else `Left
   else if y >= 0
   then `Down

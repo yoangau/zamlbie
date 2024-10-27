@@ -12,6 +12,8 @@ bug-reports: "https://github.com/yoangau/zamlbie/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.16"}
+  "notty"
+  "base"
   "odoc" {with-doc}
 ]
 build: [

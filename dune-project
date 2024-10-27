@@ -19,7 +19,7 @@
  (name zamlbie)
  (synopsis "CLI zombie infectionator game in ocaml")
  (description "CLI zombie infectionator game in ocaml")
- (depends ocaml dune)
+ (depends ocaml dune notty base)
  (tags (gamedev)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

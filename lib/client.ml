@@ -1,14 +1,17 @@
 open Notty
 open Notty_unix
 
-let left = 0x1FB07 
+let left = 0x1FB07
 let right = 0x1FB03
+
 let dot ratio even : image =
-let scale = 5.0 *.Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
-  I.uchar A.(bg black ++ fg (rgb ~r:(int_of_float scale) ~g:0 ~b:0)) (Uchar.of_int (if not even then left else right)) 1 1
+  let scale = 5.0 *. Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
+  I.uchar
+    A.(bg black ++ fg (rgb ~r:(int_of_float scale) ~g:0 ~b:0))
+    (Uchar.of_int (if not even then left else right))
+    1
+    1
 ;;
-
-
 
 let hidden_background i : image =
   I.uchar A.(fg lightblack ++ bg black) (Uchar.of_int (0x2591 + i)) 1 1
@@ -35,15 +38,15 @@ let fog_env distance_sq =
   then (
     let distance = sqrt distance_sq in
     let view_radius = view_radius_sq |> sqrt in
-    background @@ ((distance -. view_radius) /. (20.0)))
+    background @@ ((distance -. view_radius) /. 20.0))
   else if distance_sq = view_radius_sq
   then hidden_background 0
   else visible_background
 ;;
 
-let render_agent distance even = 
-    let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
-    dot (ratio *. ratio) even
+let render_agent distance even =
+  let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
+  dot (ratio *. ratio) even
 ;;
 
 let dist_sq (ax, ay) (bx, by) =
@@ -51,19 +54,19 @@ let dist_sq (ax, ay) (bx, by) =
   (dx * dx) + (dy * dy)
 ;;
 
-let is_visible distance_sq = distance_sq <= (Game.view_radius_sq)
+let is_visible distance_sq = distance_sq <= Game.view_radius_sq
 
 let render ~me:Game.{ x = mx; y = my; _ } terminal Game.{ width; height; entities } =
   let entities_set =
     Map.of_list (List.map (fun entity -> Game.((entity.x, entity.y), entity)) entities)
   in
   let image =
-    I.tabulate (width*2) height
+    I.tabulate (width * 2) height
     @@ fun x y ->
-	let x = x/2 in
+    let x = x / 2 in
     let distance_from_player = dist_sq (x, y) (mx, my) in
-    if Map.mem (x, y) entities_set && is_visible distance_from_player 
-    then render_agent distance_from_player (( x mod 2) = 0)
+    if Map.mem (x, y) entities_set && is_visible distance_from_player
+    then render_agent distance_from_player (x mod 2 = 0)
     else fog_env (float_of_int distance_from_player)
   in
   Term.image terminal image

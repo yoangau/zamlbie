@@ -1,4 +1,4 @@
 open Zamlbie
 
-let game = Game.init 10 10
-let () = Client.main_loop Client.terminal game
+let game = Server.create_game 10 10
+let () = Client.main_loop Client.terminal game 0

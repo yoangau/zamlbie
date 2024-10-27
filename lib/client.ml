@@ -21,11 +21,13 @@ let render terminal Game.{ width; height; entities } =
   Term.image terminal image
 ;;
 
-let rec main_loop t game =
-  Unix.sleepf 0.016;
-  render t game;
-  match Term.event t with
-  | `End | `Key (`Escape, []) -> ()
+type input =
+  | Exit
+  | Move of (int * int)
+
+let get_player_input terminal =
+  match Term.event terminal with
+  | `End | `Key (`Escape, []) -> Some Exit
   | `Key (`Arrow arrow, []) ->
     let dir =
       match arrow with
@@ -34,7 +36,20 @@ let rec main_loop t game =
       | `Left -> (-1, 0)
       | `Right -> (1, 0)
     in
-    let new_game = Game.move game 0 dir in
-    main_loop t new_game
-  | _ -> main_loop t game
+    Some (Move dir)
+  | _ -> None
+;;
+
+let rec main_loop terminal game id =
+  Unix.sleepf 0.016;
+  match get_player_input terminal with
+  | Some Exit -> ()
+  | Some (Move direction) ->
+    Server.on_player_input ~id ~player:0 ~direction;
+    let updated_game = Server.on_game_update ~id in
+    render terminal updated_game;
+    main_loop terminal updated_game id
+  | _ ->
+    render terminal game;
+    main_loop terminal game id
 ;;

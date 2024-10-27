@@ -10,7 +10,7 @@ homepage: "https://github.com/yoangau/zamlbie"
 doc: "https://github.com/yoangau/zamlbie"
 bug-reports: "https://github.com/yoangau/zamlbie/issues"
 depends: [
-  "ocaml"
+  "ocaml" {>= "5.2.0"}
   "dune" {>= "3.16"}
   "notty"
   "base"

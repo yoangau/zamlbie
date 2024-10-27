@@ -1,16 +1,9 @@
 open Notty
 open Notty_unix
 
-let left = 0x1FB07
-let right = 0x1FB03
-
-let dot ratio even : image =
+let dot ratio : image =
   let scale = 5.0 *. Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
-  I.uchar
-    A.(bg black ++ fg (rgb ~r:(int_of_float scale) ~g:0 ~b:0))
-    (Uchar.of_int (if not even then left else right))
-    1
-    1
+  I.uchar A.(bg (rgb ~r:(int_of_float scale) ~g:0 ~b:0)) (Uchar.of_char ' ') 1 1
 ;;
 
 let hidden_background i : image =
@@ -44,9 +37,9 @@ let fog_env distance_sq =
   else visible_background
 ;;
 
-let render_agent distance even =
+let render_agent distance =
   let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
-  dot (ratio *. ratio) even
+  dot (ratio *. ratio)
 ;;
 
 let dist_sq (ax, ay) (bx, by) =
@@ -66,7 +59,7 @@ let render ~me:Game.{ x = mx; y = my; _ } terminal Game.{ width; height; entitie
     let x = x / 2 in
     let distance_from_player = dist_sq (x, y) (mx, my) in
     if Map.mem (x, y) entities_set && is_visible distance_from_player
-    then render_agent distance_from_player (x mod 2 = 0)
+    then render_agent distance_from_player
     else fog_env (float_of_int distance_from_player)
   in
   Term.image terminal image

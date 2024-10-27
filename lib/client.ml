@@ -1,8 +1,8 @@
 open Notty
 open Notty_unix
 
-let dot : image = I.uchar A.(fg lightred) (Uchar.of_int 0x25cf) 1 1
-let background : image = I.uchar A.(fg lightblue) (Uchar.of_int 0x25cf) 1 1
+let dot : image = I.uchar A.(bg lightblue ++ fg lightred) (Uchar.of_int 0x25cf) 1 1
+let background : image = I.uchar A.(bg lightblue) (Uchar.of_char ' ') 1 1
 
 module Set = Set.Make (struct
     type t = int * int

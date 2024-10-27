@@ -1,12 +1,18 @@
 open Notty
 open Notty_unix
 
-let dot scale id : image =
-  I.uchar A.(bg black ++ fg (rgb ~r:scale ~g:0 ~b:0)) (Uchar.of_int (0x278A + id)) 1 1
+let dot ratio id : image =
+let scale = 5.0 *.Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
+  I.uchar A.(bg black ++ fg (rgb ~r:(int_of_float scale) ~g:0 ~b:0)) (Uchar.of_int (0x278A + id)) 1 1
 ;;
 
 let hidden_background i : image =
   I.uchar A.(fg lightblack ++ bg black) (Uchar.of_int (0x2591 + i)) 1 1
+;;
+
+let background ratio : image =
+  let scale = 23.0 *. Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
+  I.uchar A.(bg (gray @@ int_of_float scale)) (Uchar.of_int 0x2591) 1 1
 ;;
 
 let visible_background : image = I.uchar A.(bg black) (Uchar.of_char ' ') 1 1
@@ -19,28 +25,29 @@ module Map = Map.Make (struct
 
 let terminal = Term.create ()
 
-let fog_env distance =
-  if distance = Game.view_radius_sq
+let fog_env distance_sq =
+  let view_radius_sq = float_of_int Game.view_radius_sq in
+  if distance_sq > view_radius_sq
+  then (
+    let distance = sqrt distance_sq in
+    let view_radius = view_radius_sq |> sqrt in
+    background @@ ((distance -. view_radius) /. (20.0)))
+  else if distance_sq = view_radius_sq
   then hidden_background 0
-  else if distance > Game.view_radius_sq
-  then hidden_background 1
   else visible_background
 ;;
 
-let fog distance player =
-  if distance = Game.view_radius_sq
-  then hidden_background 0
-  else if distance > Game.view_radius_sq
-  then hidden_background 1
-  else (
+let render_agent distance player = 
     let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
-    dot (int_of_float (5.0 *. ratio *. ratio)) player)
+    dot (ratio *. ratio) player
 ;;
 
-let dist (ax, ay) (bx, by) =
+let dist_sq (ax, ay) (bx, by) =
   let dx, dy = (bx - ax, by - ay) in
   (dx * dx) + (dy * dy)
 ;;
+
+let is_visible distance_sq = distance_sq <= (Game.view_radius_sq)
 
 let render ~me:Game.{ x = mx; y = my; id; _ } terminal Game.{ width; height; entities } =
   let entities_set =
@@ -49,8 +56,10 @@ let render ~me:Game.{ x = mx; y = my; id; _ } terminal Game.{ width; height; ent
   let image =
     I.tabulate width height
     @@ fun x y ->
-    let distance = dist (x, y) (mx, my) in
-    if Map.mem (x, y) entities_set then fog distance id else fog_env distance
+    let distance_from_player = dist_sq (x, y) (mx, my) in
+    if Map.mem (x, y) entities_set && is_visible distance_from_player 
+    then render_agent distance_from_player id
+    else fog_env (float_of_int distance_from_player)
   in
   Term.image terminal image
 ;;

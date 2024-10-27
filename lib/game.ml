@@ -16,6 +16,8 @@ let find_entity { entities; _ } id entity_type =
   List.find_opt (is_entity { default_entity with id; entity_type }) entities
 ;;
 
+let add_entity game entity = { game with entities = entity :: game.entities }
+
 let update_entity game new_entity =
   { game with
     entities =

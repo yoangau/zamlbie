@@ -1,0 +1,15 @@
+type game <ocaml from="Game"> = abstract
+type move <ocaml from="Game"> = abstract
+
+
+type server_message = [ 
+    | Update of game
+    | GameOver
+    | Misc of string
+]
+
+type client_message = [ 
+    | Move of move
+    | Leave
+]
+ 

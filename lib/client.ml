@@ -1,5 +1,6 @@
 open Notty
 open Notty_unix
+open Lwt.Infix
 
 let dot ratio : image =
   let scale = 5.0 *. Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
@@ -76,28 +77,48 @@ let get_player_input terminal =
   | _ -> None
 ;;
 
-let run () =
-  let ( let* ) = Lwt.bind in
-  let response =
-    Lwt_main.run
-      (let* maybe_websocket = Hyper.websocket "ws://127.0.0.1:8080/join/0" in
-       let websocket = Result.get_ok maybe_websocket in
-       let* () = Hyper.send websocket "Hello" in
-       Hyper.receive websocket)
-  in
-  print_endline (Option.get response)
+let ( let+ ) = Lwt.bind
+
+let receive socket =
+  let open Lwt.Infix in
+  Hyper.receive socket
+  >>= function
+  | Some message ->
+    Lwt_result.return @@ Message.Serializer.server_message_of_string message
+  | None -> Lwt_result.fail "No message received"
 ;;
 
-let rec main_loop terminal game game_id =
-  Unix.sleepf 0.016;
+let send message socket =
+  Hyper.send socket @@ Message.Serializer.string_of_client_message message
+;;
+
+let rec main_loop ~terminal ~game ~socket =
+  render ~me:Game.(List.hd game.entities) terminal game;
+  render ~me:Game.(List.hd game.entities) terminal game;
   match get_player_input terminal with
-  | Some Exit -> ()
-  | Some (Move _direction) ->
-    (* Server.on_player_input ~game_id ~player_id:0 direction |> ignore; *)
-    let updated_game = Server.on_game_update ~game_id in
-    render ~me:(List.hd updated_game.state.entities) terminal updated_game.state;
-    main_loop terminal updated_game.state game_id
-  | _ ->
-    render ~me:(List.hd game.entities) terminal game;
-    main_loop terminal game game_id
+  | Some Exit -> Lwt_result.return ()
+  | Some (Move direction) ->
+    send (`Move direction) socket |> ignore;
+    receive socket
+    >>= (function
+     | Ok (`Update updated_game) ->
+       print_endline "received game";
+       main_loop ~terminal ~game:updated_game ~socket
+     | _ -> main_loop ~terminal ~game ~socket)
+  | None ->
+    Unix.sleepf 0.1;
+    main_loop ~terminal ~game ~socket
+;;
+
+let run () =
+  let terminal = Term.create () in
+  Lwt_main.run
+    (let+ maybe_websocket = Hyper.websocket "ws://127.0.0.1:8080/join/0" in
+     let websocket = Result.get_ok maybe_websocket in
+     receive websocket
+     >>= function
+     | Ok (`Update game) -> main_loop ~terminal ~game ~socket:websocket
+     | _ -> Lwt_result.fail "Unexpected message")
+  |> ignore;
+  Some ()
 ;;

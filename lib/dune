@@ -29,4 +29,4 @@
 (library
  (name zamlbie)
  (modules server client game game_j game_t message message_j message_t)
- (libraries base notty notty.unix lwt.unix dream hyper atdgen))
+ (libraries base notty notty.unix notty.lwt lwt.unix dream hyper atdgen))

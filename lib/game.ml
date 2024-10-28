@@ -38,10 +38,4 @@ let move ~game ~id ~entity_type ~move =
   Some (update_entity game { entity with x = nx; y = ny })
 ;;
 
-let init width height =
-  { entities =
-      [ default_entity; { default_entity with id = 1; x = width - 1; y = height - 1 } ];
-    width;
-    height
-  }
-;;
+let init width height = { entities = []; width; height }

@@ -1,5 +1,6 @@
 open Base
 open Lwt.Infix
+open Lwt.Syntax
 
 type match_state =
   { mutable players : Dream.websocket list; (* List of player connections *)
@@ -41,11 +42,7 @@ let create_game width height =
 ;;
 
 let on_player_input ~game ~player_id move =
-  let ( let* ) = Option.( >>= ) in
-  let agent_move = get_agent_move game in
-  let* game = Game.move ~game ~id:player_id ~entity_type:`Player ~move in
-  let* game = Game.move ~game ~id:1 ~entity_type:`Player ~move:agent_move in
-  Some game
+  Game.move ~game ~id:player_id ~entity_type:`Player ~move
 ;;
 
 let on_game_update ~game_id = Hashtbl.find_exn games game_id
@@ -78,13 +75,13 @@ let receive socket =
 (* Function to broadcast game state to all players *)
 
 let broadcast_game game_match =
-  Lwt_list.iter_p (send (`Update game_match.state)) game_match.players
+  Lwt_list.iter_s (send (`Update game_match.state)) game_match.players
 ;;
 
 (* Handle each client WebSocket connection *)
 let handle_websocket_connection game_match player_socket =
   let _game_is_starting = join_match game_match player_socket in
-  broadcast_game game_match |> Lwt.ignore_result;
+  let* () = broadcast_game game_match in
   let rec game_match_loop () =
     receive player_socket
     >>= function
@@ -92,7 +89,7 @@ let handle_websocket_connection game_match player_socket =
       (match on_player_input ~game:game_match.state ~player_id:0 move with
        | Some new_game ->
          game_match.state <- new_game;
-         broadcast_game game_match |> Lwt.ignore_result;
+         let* () = broadcast_game game_match in
          game_match_loop ()
        | None -> game_match_loop ())
     | Ok `Leave -> Lwt.return ()

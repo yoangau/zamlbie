@@ -15,6 +15,7 @@ depends: [
   "notty"
   "base"
   "dream"
+  "hyper"
   "websocket"
   "atdgen"
   "lwt"

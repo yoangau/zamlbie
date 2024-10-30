@@ -59,7 +59,6 @@ let join_match game_match player_socket =
 ;;
 
 let send message socket =
-  Dream.log "Sending message: %s" @@ Message.Serializer.string_of_server_message message;
   Dream.send socket @@ Message.Serializer.string_of_server_message message
 ;;
 
@@ -67,8 +66,8 @@ let receive socket =
   Dream.receive socket
   >>= function
   | Some message ->
-    Dream.log "Received message: %s" message;
-    Lwt_result.return @@ Message.Serializer.client_message_of_string message
+    Dream.log "Raw received message: %S" message;
+    message |> Message.Serializer.client_message_of_string |> Lwt_result.return
   | None -> Lwt_result.fail "No message received"
 ;;
 
@@ -80,27 +79,33 @@ let broadcast_game game_match =
 
 (* Handle each client WebSocket connection *)
 let handle_websocket_connection game_match player_socket =
-  let _game_is_starting = join_match game_match player_socket in
+  let* _game_is_starting = join_match game_match player_socket in
   let* () = broadcast_game game_match in
   let rec game_match_loop () =
     receive player_socket
     >>= function
-    | Ok (`Move move) ->
-      (match on_player_input ~game:game_match.state ~player_id:0 move with
+    | Ok (`Move move) -> 
+  (match on_player_input ~game:game_match.state ~player_id:0 move with
        | Some new_game ->
          game_match.state <- new_game;
-         let* () = broadcast_game game_match in
+         broadcast_game game_match |> Lwt.ignore_result;
          game_match_loop ()
        | None -> game_match_loop ())
-    | Ok `Leave -> Lwt.return ()
-    | Error _ -> Lwt.return ()
+
+    | Error _ | _ -> Lwt.return ()
   in
   game_match_loop ()
 ;;
 
 (* Set up WebSocket routes *)
 let run () =
-  Dream.run
+  Dream.initialize_log
+    ~backtraces:true
+    ~async_exception_hook:false
+    ~level:`Info
+    ~enable:true
+    ();
+  Dream.run ~error_handler:Dream.debug_error_handler
   @@ Dream.logger
   @@ Dream.router
        (* TODO: Add parameter for game config width height n_player vision tick_speed*)

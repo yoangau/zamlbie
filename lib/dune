@@ -28,5 +28,24 @@
 
 (library
  (name zamlbie)
- (modules server client game game_j game_t message message_j message_t)
- (libraries base notty notty.unix notty.lwt lwt.unix dream hyper atdgen))
+ (modules
+  server
+  client
+  ws_client
+  game
+  game_j
+  game_t
+  message
+  message_j
+  message_t)
+ (libraries
+  websocket-lwt-unix
+  base
+  notty
+  notty.unix
+  notty.lwt
+  lwt.unix
+  dream
+  atdgen)
+ (preprocess
+  (pps lwt_ppx)))

@@ -27,6 +27,7 @@
   base
   dream
   hyper
+  websocket
   atdgen
   lwt)
  (tags (gamedev)))

@@ -84,14 +84,13 @@ let handle_websocket_connection game_match player_socket =
   let rec game_match_loop () =
     receive player_socket
     >>= function
-    | Ok (`Move move) -> 
-  (match on_player_input ~game:game_match.state ~player_id:0 move with
+    | Ok (`Move move) ->
+      (match on_player_input ~game:game_match.state ~player_id:0 move with
        | Some new_game ->
          game_match.state <- new_game;
          broadcast_game game_match |> Lwt.ignore_result;
          game_match_loop ()
        | None -> game_match_loop ())
-
     | Error _ | _ -> Lwt.return ()
   in
   game_match_loop ()

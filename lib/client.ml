@@ -1,10 +1,5 @@
 open Notty_lwt
 
-let send _message socket =
-  let serialized = "wow" in
-  print_endline @@ "message sent: " ^ serialized;
-  Hyper.send socket serialized
-;;
 
 let send_player_input terminal () =
 Lwt_stream.map_s (function

@@ -6,6 +6,4 @@
 (executable
  (public_name server)
  (name main_server)
- (libraries zamlbie)
- (modes
-  (byte exe)))
+ (libraries zamlbie))

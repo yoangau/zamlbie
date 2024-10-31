@@ -98,12 +98,6 @@ let handle_websocket_connection game_match player_socket =
 
 (* Set up WebSocket routes *)
 let run () =
-  Dream.initialize_log
-    ~backtraces:true
-    ~async_exception_hook:false
-    ~level:`Info
-    ~enable:true
-    ();
   Dream.run ~error_handler:Dream.debug_error_handler
   @@ Dream.logger
   @@ Dream.router

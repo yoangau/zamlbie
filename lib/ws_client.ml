@@ -13,10 +13,10 @@ let client uri receive send =
   connect ~ctx client uri
   >>= fun conn ->
   let close_sent = ref false in
-  let rec react () =
+  let react () =
     Websocket_lwt_unix.read conn
     >>= function
-    | { Frame.opcode = Ping; _ } -> write conn (Frame.create ~opcode:Pong ()) >>= react
+    | { Frame.opcode = Ping; _ } -> write conn (Frame.create ~opcode:Pong ()) >>= fun _ -> Lwt.return @@ Some ()
     | { opcode = Close; content; _ } ->
       (* Immediately echo and pass this last message to the user *)
       (if !close_sent
@@ -24,10 +24,10 @@ let client uri receive send =
        else if String.length content >= 2
        then write conn (Frame.create ~opcode:Close ~content:(String.sub content 0 2) ())
        else write conn (Frame.close 1000))
-      >>= fun () -> Websocket_lwt_unix.close_transport conn >>= fun _ -> Lwt.return None
-    | { opcode = Pong; _ } -> react ()
+      >>= fun _ -> Websocket_lwt_unix.close_transport conn >>= fun _ -> Lwt.return None
+    | { opcode = Pong; _ } -> Lwt.return @@ Some ()
     | { opcode = Text; content; _ } | { opcode = Binary; content; _ } ->
-      receive content >>= react
+      receive content >>= fun _ -> Lwt.return @@ Some ()
     | _ -> Websocket_lwt_unix.close_transport conn >>= fun _ -> Lwt.return None
   in
   let pushf () =
@@ -39,9 +39,9 @@ let client uri receive send =
         write conn (Frame.create ~opcode:Close ())
         >>= fun () ->
         close_sent := true;
-        Lwt.return None
+        Lwt.return_unit
       | Some content ->
-        write conn (Frame.create ~content ()) >>= fun _ -> Lwt.return @@ Some ())
+        write conn (Frame.create ~content ()) >>= fun _ -> Lwt.return_unit)
   in
   [ pushf (); Lwt_stream.from react ]
   |> Lwt_stream.choose

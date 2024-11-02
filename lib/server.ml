@@ -98,7 +98,7 @@ let handle_websocket_connection game_match player_socket =
 
 (* Set up WebSocket routes *)
 let run () =
-  Dream.run ~error_handler:Dream.debug_error_handler
+  Dream.run ~error_handler:Dream.debug_error_handler ~interface:"0.0.0.0" ~port:8080
   @@ Dream.logger
   @@ Dream.router
        (* TODO: Add parameter for game config width height n_player vision tick_speed*)

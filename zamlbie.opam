@@ -15,8 +15,8 @@ depends: [
   "notty"
   "base"
   "dream"
-  "hyper"
   "websocket"
+  "websocket-lwt-unix"
   "atdgen"
   "lwt"
   "odoc" {with-doc}

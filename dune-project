@@ -26,8 +26,8 @@
   notty
   base
   dream
-  hyper
   websocket
+  websocket-lwt-unix
   atdgen
   lwt)
  (tags (gamedev)))

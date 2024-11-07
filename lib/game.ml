@@ -8,7 +8,7 @@ let get_move_delta = function
   | `Right -> (1, 0)
 ;;
 
-let default_entity = { id = 0; entity_type = `Player; x = 0; y = 0 }
+let default_entity = { id = 0; entity_type = `Player `Ally; x = 0; y = 0 }
 let is_entity a b = a.id = b.id && a.entity_type = b.entity_type
 
 let find_entity { entities; _ } id entity_type =

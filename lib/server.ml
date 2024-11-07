@@ -22,7 +22,8 @@ let create_game config =
 ;;
 
 let on_player_input ~game ~player_id move =
-  Game.move ~game ~id:player_id ~entity_type:`Player ~move
+  (* TODO: Use actual player type*)
+  Game.move ~game ~id:player_id ~entity_type:(`Player `Ally) ~move
 ;;
 
 let on_game_update ~game_id = Hashtbl.find_exn games game_id

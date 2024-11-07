@@ -1,4 +1,6 @@
-type entity_type = [ Player ]
+type player_type = [ Ally | Enemy ]
+
+type entity_type = [ Player of player_type ]
 
 type entity =
   { entity_type : entity_type;

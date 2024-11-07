@@ -84,25 +84,28 @@ let broadcast_game game_match =
 ;;
 
 (* Handle each client WebSocket connection *)
-let handle_websocket_connection game_match player_socket =
-  match try_join_match game_match player_socket with
-  | None -> send (`Misc "Game full!") player_socket
-  | Some client_id ->
-    let* () = send (`Joined client_id) player_socket in
-    let* () = broadcast_game game_match in
-    let rec game_match_loop () =
-      receive player_socket
-      >>= function
-      | Ok (`Move move) ->
-        (match on_player_input ~game:game_match.state ~player_id:client_id move with
-         | Some new_game ->
-           game_match.state <- new_game;
-           broadcast_game game_match |> Lwt.ignore_result;
-           game_match_loop ()
-         | None -> game_match_loop ())
-      | Error _ | _ -> Lwt.return ()
-    in
-    game_match_loop ()
+let handle_websocket_connection maybe_game player_socket =
+  match maybe_game with
+  | None -> send (`Rejected "Game not found!") player_socket
+  | Some game_match ->
+    (match try_join_match game_match player_socket with
+     | None -> send (`Rejected "Game full!") player_socket
+     | Some client_id ->
+       let* () = send (`Joined client_id) player_socket in
+       let* () = broadcast_game game_match in
+       let rec game_match_loop () =
+         receive player_socket
+         >>= function
+         | Ok (`Move move) ->
+           (match on_player_input ~game:game_match.state ~player_id:client_id move with
+            | Some new_game ->
+              game_match.state <- new_game;
+              broadcast_game game_match |> Lwt.ignore_result;
+              game_match_loop ()
+            | None -> game_match_loop ())
+         | Error _ | _ -> Lwt.return ()
+       in
+       game_match_loop ())
 ;;
 
 (* Set up WebSocket routes *)
@@ -118,8 +121,7 @@ let run () =
          (Dream.get "/join/:id"
           @@ fun request ->
           let id = Dream.param request "id" |> Int.of_string in
-          match Hashtbl.find games id with
-          | Some game_match -> Dream.websocket @@ handle_websocket_connection game_match
-          | None -> Dream.respond "Game not found")
+          let maybe_game = Hashtbl.find games id in
+          Dream.websocket @@ handle_websocket_connection maybe_game)
        ]
 ;;

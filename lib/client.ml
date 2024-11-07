@@ -74,14 +74,19 @@ let send_player_input terminal () =
 ;;
 
 let receive client_id terminal message =
-  print_endline @@ "message received: " ^ message;
   match Message.Serializer.server_message_of_string message with
   | `Joined assigned_client_id ->
     client_id := Some assigned_client_id;
     Lwt.return ()
   | `Update updated_game -> render ~me:(Option.get !client_id) terminal updated_game
-  | _ ->
-    print_endline "other";
+  | `Rejected reason ->
+    failwith reason |> ignore;
+    Lwt.return ()
+  | `GameOver ->
+    exit 0 |> ignore;
+    Lwt.return ()
+  | `Misc message ->
+    print_endline message;
     Lwt.return ()
 ;;
 

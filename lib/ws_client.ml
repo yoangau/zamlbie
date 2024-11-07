@@ -34,14 +34,19 @@ let client uri receive send =
   let pushf () =
     send ()
     |> Lwt_stream.map_s (function
-      | None ->
+      | Some `Leave ->
         Lwt_log.debug ~section "Got EOF. Sending a close frame."
         >>= fun () ->
         write conn (Frame.create ~opcode:Close ())
         >>= fun () ->
         close_sent := true;
         Lwt.return_unit
-      | Some content -> write conn (Frame.create ~content ()) >>= fun _ -> Lwt.return_unit)
+      | Some (`Move _ as move) ->
+        write
+          conn
+          (Frame.create ~content:(Message.Serializer.string_of_client_message move) ())
+        >>= fun _ -> Lwt.return_unit
+      | _ -> Lwt.return_unit)
   in
   [ pushf (); Lwt_stream.from react ]
   |> Lwt_stream.choose

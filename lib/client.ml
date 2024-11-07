@@ -67,10 +67,9 @@ let render ~me terminal Game.{ width; height; entities } =
 let send_player_input terminal () =
   Lwt_stream.map_s
     (function
-      | `Key (`Arrow move, []) ->
-        Lwt.return @@ Some (Message.Serializer.string_of_client_message (`Move move))
-      | `Key (`Escape, []) -> Lwt.return None
-      | _ -> Lwt.return @@ Some "lol")
+      | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Move move)
+      | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
+      | _ -> Lwt.return @@ None)
     (Term.events terminal)
 ;;
 
@@ -92,6 +91,5 @@ let run () =
   let send_player_input = send_player_input terminal in
   let client_id = ref None in
   let receive = receive client_id terminal in
-  Lwt_main.run (Ws_client.client uri receive send_player_input);
-  Unix.sleep 5
+  Lwt_main.run (Ws_client.client uri receive send_player_input)
 ;;

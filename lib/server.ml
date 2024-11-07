@@ -5,7 +5,7 @@ open Lwt.Syntax
 type match_state =
   { mutable players : Dream.websocket list; (* List of player connections *)
     mutable game_started : bool;
-    mutable state : Game_j.game (* Example game state *)
+    mutable state : Game.game (* Example game state *)
   }
 
 let games = Hashtbl.create (module Int)
@@ -29,7 +29,7 @@ let on_player_input ~game ~player_id move =
 let on_game_update ~game_id = Hashtbl.find_exn games game_id
 
 let try_join_match game_match player_socket =
-  let room_size = 2 in
+  let room_size = game_match.state.config.player_count in
   let previous_player_count = List.length game_match.players in
   if previous_player_count >= room_size
   then None

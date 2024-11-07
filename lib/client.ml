@@ -23,8 +23,8 @@ module Map = Map.Make (struct
     let compare = Stdlib.compare
   end)
 
-let fog_env distance_sq =
-  let view_radius_sq = float_of_int Game.view_radius_sq in
+let fog_env distance_sq view_radius_sq =
+  let view_radius_sq = float_of_int view_radius_sq in
   if distance_sq > view_radius_sq
   then (
     let distance = sqrt distance_sq in
@@ -35,8 +35,8 @@ let fog_env distance_sq =
   else visible_background
 ;;
 
-let render_agent distance =
-  let ratio = 1.0 -. (float_of_int distance /. float_of_int Game.view_radius_sq) in
+let render_agent distance_sq view_radius_sq =
+  let ratio = 1.0 -. (float_of_int distance_sq /. float_of_int view_radius_sq) in
   dot (ratio *. ratio)
 ;;
 
@@ -45,21 +45,23 @@ let dist_sq (ax, ay) (bx, by) =
   (dx * dx) + (dy * dy)
 ;;
 
-let is_visible distance_sq = distance_sq <= Game.view_radius_sq
+let is_visible distance_sq view_radius_sq = distance_sq <= view_radius_sq
 
-let render ~me terminal Game.{ width; height; entities } =
+let render ~me terminal Game.{ config; entities } =
   let entities_set =
     Map.of_list (List.map (fun entity -> Game.((entity.x, entity.y), entity)) entities)
   in
   let Game.{ x = mx; y = my; _ } = List.find (fun e -> e.Game.id = me) entities in
   let image =
-    I.tabulate (width * 2) height
+    I.tabulate (config.width * 2) config.height
     @@ fun x y ->
     let x = x / 2 in
     let distance_from_player = dist_sq (x, y) (mx, my) in
-    if Map.mem (x, y) entities_set && is_visible distance_from_player
-    then render_agent distance_from_player
-    else fog_env (float_of_int distance_from_player)
+    (* TODO: use ally/enemy view_radius logic *)
+    let view_radius_sq = config.view_radius_ally * config.view_radius_ally in
+    if Map.mem (x, y) entities_set && is_visible distance_from_player view_radius_sq
+    then render_agent distance_from_player view_radius_sq
+    else fog_env (float_of_int distance_from_player) view_radius_sq
   in
   Term.image terminal image
 ;;
@@ -92,7 +94,7 @@ let receive client_id terminal message =
 
 let run () =
   let terminal = Term.create () in
-  let uri = Uri.of_string "http://127.0.0.1:8080/join/0" in
+  let uri = Uri.of_string "http://127.0.0.1:7777/join/0" in
   let send_player_input = send_player_input terminal in
   let client_id = ref None in
   let receive = receive client_id terminal in

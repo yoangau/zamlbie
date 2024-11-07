@@ -9,7 +9,6 @@ let get_move_delta = function
 ;;
 
 let default_entity = { id = 0; entity_type = `Player; x = 0; y = 0 }
-let view_radius_sq = 5 * 5
 let is_entity a b = a.id = b.id && a.entity_type = b.entity_type
 
 let find_entity { entities; _ } id entity_type =
@@ -32,10 +31,21 @@ let move ~game ~id ~entity_type ~move =
   let* entity = find_entity game id entity_type in
   let dx, dy = get_move_delta move in
   let nx, ny =
-    ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.width - 1),
-      Base.Int.clamp_exn (entity.y + dy) ~min:0 ~max:(game.height - 1) )
+    ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.config.width - 1),
+      Base.Int.clamp_exn (entity.y + dy) ~min:0 ~max:(game.config.height - 1) )
   in
   Some (update_entity game { entity with x = nx; y = ny })
 ;;
 
-let init width height = { entities = []; width; height }
+let default_config =
+  { view_radius_ally = 5;
+    view_radius_enemy = 5;
+    width = 20;
+    height = 20;
+    player_count = 2;
+    time_limit = 60;
+    tick_rate = 0.5
+  }
+;;
+
+let init config = { entities = []; config }

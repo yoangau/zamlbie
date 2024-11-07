@@ -7,10 +7,19 @@ type entity =
     y : int
   }
 
+type config =
+  { view_radius_ally : int;
+    view_radius_enemy : int;
+    width : int;
+    height : int;
+    player_count : int;
+    time_limit : int;
+    tick_rate : float
+  }
+
 type game =
   { entities : entity list;
-    width : int;
-    height : int
+    config : config
   }
 
 type move =

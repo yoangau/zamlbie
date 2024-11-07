@@ -1,6 +1,6 @@
 open Zamlbie
 
 let () =
-  Server.create_game 40 40 |> ignore;
+  Server.create_game Game.default_config |> ignore;
   Server.run ()
 ;;

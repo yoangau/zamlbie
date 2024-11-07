@@ -11,28 +11,8 @@ type match_state =
 let games = Hashtbl.create (module Int)
 let next_id = ref 0
 
-let get_agent_move Game.{ entities; _ } =
-  let Game.{ x = px; y = py; _ } = List.nth_exn entities 0 in
-  let Game.{ x = ax; y = ay; _ } = List.nth_exn entities 1 in
-  let x = px - ax in
-  let y = py - ay in
-  if (x * x) + (y * y) > Game.view_radius_sq
-  then (
-    match Random.int 4 with
-    | 0 -> `Up
-    | 1 -> `Down
-    | 2 -> `Left
-    | 3 -> `Right
-    | _ -> assert false)
-  else if Int.abs x > Int.abs y
-  then if x >= 0 then `Right else `Left
-  else if y >= 0
-  then `Down
-  else `Up
-;;
-
-let create_game width height =
-  let new_game = Game.init width height in
+let create_game config =
+  let new_game = Game.init config in
   Hashtbl.add_exn
     games
     ~key:!next_id
@@ -110,13 +90,13 @@ let handle_websocket_connection maybe_game player_socket =
 
 (* Set up WebSocket routes *)
 let run () =
-  Dream.run ~error_handler:Dream.debug_error_handler ~interface:"0.0.0.0" ~port:8080
+  Dream.run ~error_handler:Dream.debug_error_handler ~interface:"0.0.0.0" ~port:7777
   @@ Dream.logger
   @@ Dream.router
        (* TODO: Add parameter for game config width height n_player vision tick_speed*)
        [ (Dream.post "/create_game"
           @@ fun _ ->
-          let game = create_game 40 40 in
+          let game = create_game Game.default_config in
           Dream.respond (Game.Serializer.string_of_game game));
          (Dream.get "/join/:id"
           @@ fun request ->

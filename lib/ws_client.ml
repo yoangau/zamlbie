@@ -16,7 +16,8 @@ let client uri receive send =
   let react () =
     Websocket_lwt_unix.read conn
     >>= function
-    | { Frame.opcode = Ping; _ } -> write conn (Frame.create ~opcode:Pong ()) >>= fun _ -> Lwt.return @@ Some ()
+    | { Frame.opcode = Ping; _ } ->
+      write conn (Frame.create ~opcode:Pong ()) >>= fun _ -> Lwt.return @@ Some ()
     | { opcode = Close; content; _ } ->
       (* Immediately echo and pass this last message to the user *)
       (if !close_sent
@@ -40,8 +41,7 @@ let client uri receive send =
         >>= fun () ->
         close_sent := true;
         Lwt.return_unit
-      | Some content ->
-        write conn (Frame.create ~content ()) >>= fun _ -> Lwt.return_unit)
+      | Some content -> write conn (Frame.create ~content ()) >>= fun _ -> Lwt.return_unit)
   in
   [ pushf (); Lwt_stream.from react ]
   |> Lwt_stream.choose

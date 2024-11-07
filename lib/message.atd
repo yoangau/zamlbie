@@ -6,6 +6,7 @@ type server_message = [
     | Update of game
     | GameOver
     | Misc of string
+    | Joined of int
 ]
 
 type client_message = [ 

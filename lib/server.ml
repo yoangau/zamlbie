@@ -47,15 +47,21 @@ let on_player_input ~game ~player_id move =
 
 let on_game_update ~game_id = Hashtbl.find_exn games game_id
 
-let join_match game_match player_socket =
-  game_match.state
-  <- Game.add_entity
-       game_match.state
-       { Game.default_entity with id = List.length game_match.state.entities };
-  if List.length game_match.players < 2
-  then game_match.players <- player_socket :: game_match.players;
-  if List.length game_match.players = 2 then game_match.game_started <- true;
-  Lwt.return game_match.game_started
+let try_join_match game_match player_socket =
+  let room_size = 2 in
+  let previous_player_count = List.length game_match.players in
+  if previous_player_count >= room_size
+  then None
+  else (
+    if previous_player_count < room_size
+    then (
+      game_match.players <- player_socket :: game_match.players;
+      game_match.state
+      <- Game.add_entity
+           game_match.state
+           { Game.default_entity with id = previous_player_count });
+    if previous_player_count + 1 = room_size then game_match.game_started <- true;
+    Some previous_player_count)
 ;;
 
 let send message socket =
@@ -79,21 +85,24 @@ let broadcast_game game_match =
 
 (* Handle each client WebSocket connection *)
 let handle_websocket_connection game_match player_socket =
-  let* _game_is_starting = join_match game_match player_socket in
-  let* () = broadcast_game game_match in
-  let rec game_match_loop () =
-    receive player_socket
-    >>= function
-    | Ok (`Move move) ->
-      (match on_player_input ~game:game_match.state ~player_id:0 move with
-       | Some new_game ->
-         game_match.state <- new_game;
-         broadcast_game game_match |> Lwt.ignore_result;
-         game_match_loop ()
-       | None -> game_match_loop ())
-    | Error _ | _ -> Lwt.return ()
-  in
-  game_match_loop ()
+  match try_join_match game_match player_socket with
+  | None -> send (`Misc "Game full!") player_socket
+  | Some client_id ->
+    let* () = send (`Joined client_id) player_socket in
+    let* () = broadcast_game game_match in
+    let rec game_match_loop () =
+      receive player_socket
+      >>= function
+      | Ok (`Move move) ->
+        (match on_player_input ~game:game_match.state ~player_id:client_id move with
+         | Some new_game ->
+           game_match.state <- new_game;
+           broadcast_game game_match |> Lwt.ignore_result;
+           game_match_loop ()
+         | None -> game_match_loop ())
+      | Error _ | _ -> Lwt.return ()
+    in
+    game_match_loop ()
 ;;
 
 (* Set up WebSocket routes *)

@@ -96,8 +96,10 @@ let run () =
   @@ Dream.router
        (* TODO: Add parameter for game config width height n_player vision tick_speed*)
        [ (Dream.post "/create_game"
-          @@ fun _ ->
-          let game = create_game Game.default_config in
+          @@ fun request ->
+          let%lwt body = Dream.body request in
+          let config = Game.Serializer.config_of_string body in
+          let game = create_game config in
           Dream.respond (Game.Serializer.string_of_game game));
          (Dream.get "/join/:id"
           @@ fun request ->

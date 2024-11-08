@@ -35,26 +35,28 @@ let create_game config =
 
 let on_player_input ~game ~player_id move = Game.move ~game ~id:player_id ~move
 
+let get_player_count players =
+  Stdlib.Array.fold_left
+    (fun acc (_, s) -> acc + if Option.is_some s then 1 else 0)
+    0
+    players
+;;
+
 let try_join_match game_match player_socket =
   let room_size = game_match.state.config.player_count in
-  let previous_player_count =
-    Stdlib.Array.fold_left
-      (fun acc (_, s) -> acc + if Option.is_some s then 1 else 0)
-      0
-      game_match.players
-  in
+  let previous_player_count = get_player_count game_match.players in
+  let new_player_count = previous_player_count + 1 in
+  let player_id = previous_player_count in
   if previous_player_count = room_size
   then None
   else (
     if previous_player_count < room_size
     then (
-      game_match.players.(previous_player_count) <- (None, Some player_socket);
+      game_match.players.(player_id) <- (None, Some player_socket);
       game_match.state
-      <- Game.add_entity
-           game_match.state
-           { Game.default_entity with id = previous_player_count });
-    if previous_player_count + 1 = room_size then game_match.game_started <- true;
-    Some previous_player_count)
+      <- Game.add_entity game_match.state { Game.default_entity with id = player_id });
+    if new_player_count = room_size then game_match.game_started <- true;
+    Some player_id)
 ;;
 
 let send message socket =

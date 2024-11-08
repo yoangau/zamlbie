@@ -92,19 +92,11 @@ let receive client_id terminal message =
     Lwt.return ()
 ;;
 
-let run () =
-  Lwt_main.run
-    (let open Lwt.Infix in
-     Rest_client.create_game Game.default_config
-     >>= function
-     | None -> failwith "Failed to create game"
-     | Some game ->
-       let uri =
-         Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game.game_id)
-       in
-       let terminal = Term.create () in
-       let send_player_input = send_player_input terminal in
-       let client_id = ref None in
-       let receive = receive client_id terminal in
-       Ws_client.client uri receive send_player_input)
+let join_game game_id =
+  let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
+  let terminal = Term.create () in
+  let send_player_input = send_player_input terminal in
+  let client_id = ref None in
+  let receive = receive client_id terminal in
+  Ws_client.client uri receive send_player_input
 ;;

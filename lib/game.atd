@@ -16,7 +16,7 @@ type config =
     height : int;
     player_count : int;
     time_limit : int;
-    tick_rate : float
+    tick_delta : float
   }
 
 type game =

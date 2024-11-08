@@ -28,6 +28,7 @@
   dream
   websocket
   websocket-lwt-unix
+  cohttp-lwt-unix
   atdgen
   lwt)
  (tags (gamedev)))

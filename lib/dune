@@ -32,6 +32,8 @@
   server
   client
   ws_client
+  rest_client
+  config
   game
   game_j
   game_t

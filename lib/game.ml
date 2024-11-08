@@ -48,4 +48,4 @@ let default_config =
   }
 ;;
 
-let init config = { entities = []; config }
+let init game_id config = { game_id; entities = []; config }

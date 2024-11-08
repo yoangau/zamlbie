@@ -40,7 +40,7 @@ let default_config =
     height = 20;
     player_count = 2;
     time_limit = 60;
-    tick_rate = 0.5
+    tick_delta = 0.5
   }
 ;;
 

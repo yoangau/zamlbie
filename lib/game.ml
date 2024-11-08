@@ -9,12 +9,8 @@ let get_move_delta = function
 ;;
 
 let default_entity = { id = 0; entity_type = `Player `Ally; x = 0; y = 0 }
-let is_entity a b = a.id = b.id && a.entity_type = b.entity_type
-
-let find_entity { entities; _ } id entity_type =
-  List.find_opt (is_entity { default_entity with id; entity_type }) entities
-;;
-
+let is_entity a b = a.id = b.id
+let find_entity { entities; _ } id = List.find_opt (fun a -> a.id = id) entities
 let add_entity game entity = { game with entities = entity :: game.entities }
 
 let update_entity game new_entity =
@@ -26,9 +22,9 @@ let update_entity game new_entity =
   }
 ;;
 
-let move ~game ~id ~entity_type ~move =
+let move ~game ~id ~move =
   let ( let* ) = Base.Option.( >>= ) in
-  let* entity = find_entity game id entity_type in
+  let* entity = find_entity game id in
   let dx, dy = get_move_delta move in
   let nx, ny =
     ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.config.width - 1),

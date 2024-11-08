@@ -3,40 +3,52 @@ open Lwt.Infix
 open Lwt.Syntax
 
 type match_state =
-  { mutable players : Dream.websocket list; (* List of player connections *)
+  { players : (Game.move option * Dream.websocket option) array;
+    (* List of player connections *)
     mutable game_started : bool;
     mutable state : Game.game (* Example game state *)
   }
 
 let games = Hashtbl.create (module Int)
 let next_id = ref 0
+let find_game ~game_id = Hashtbl.find_exn games game_id
 
 let create_game config =
   let new_game = Game.init (Hashtbl.length games) config in
+  (* let thread game_id =
+     let step () =
+     let game = find_game ~game_id in
+     let tick () = Lwt_unix.sleep game.config.tick_rate in
+     let List.map receive game.players
+  *)
   Hashtbl.add_exn
     games
     ~key:!next_id
-    ~data:{ players = []; game_started = true; state = new_game };
+    ~data:
+      { players = Stdlib.Array.make new_game.config.player_count (None, None);
+        game_started = true;
+        state = new_game
+      };
   Int.incr next_id;
   new_game
 ;;
 
-let on_player_input ~game ~player_id move =
-  (* TODO: Use actual player type*)
-  Game.move ~game ~id:player_id ~entity_type:(`Player `Ally) ~move
-;;
-
-let on_game_update ~game_id = Hashtbl.find_exn games game_id
+let on_player_input ~game ~player_id move = Game.move ~game ~id:player_id ~move
 
 let try_join_match game_match player_socket =
   let room_size = game_match.state.config.player_count in
-  let previous_player_count = List.length game_match.players in
-  if previous_player_count >= room_size
+  let previous_player_count =
+    Stdlib.Array.fold_left
+      (fun acc (_, s) -> acc + if Option.is_some s then 1 else 0)
+      0
+      game_match.players
+  in
+  if previous_player_count = room_size
   then None
   else (
     if previous_player_count < room_size
     then (
-      game_match.players <- player_socket :: game_match.players;
+      game_match.players.(previous_player_count) <- (None, Some player_socket);
       game_match.state
       <- Game.add_entity
            game_match.state
@@ -61,7 +73,10 @@ let receive socket =
 (* Function to broadcast game state to all players *)
 
 let broadcast_game game_match =
-  Lwt_list.iter_s (send (`Update game_match.state)) game_match.players
+  game_match.players
+  |> Stdlib.Array.to_list
+  |> Stdlib.List.filter_map (fun (_, w) -> w)
+  |> Lwt_list.iter_s (send (`Update game_match.state))
 ;;
 
 (* Handle each client WebSocket connection *)
@@ -74,7 +89,7 @@ let handle_websocket_connection maybe_game player_socket =
      | Some client_id ->
        let* () = send (`Joined client_id) player_socket in
        let* () = broadcast_game game_match in
-       let rec game_match_loop () =
+       let rec input_loop () =
          receive player_socket
          >>= function
          | Ok (`Move move) ->
@@ -82,11 +97,11 @@ let handle_websocket_connection maybe_game player_socket =
             | Some new_game ->
               game_match.state <- new_game;
               broadcast_game game_match |> Lwt.ignore_result;
-              game_match_loop ()
-            | None -> game_match_loop ())
+              input_loop ()
+            | None -> input_loop ())
          | Error _ | _ -> Lwt.return ()
        in
-       game_match_loop ())
+       input_loop ())
 ;;
 
 (* Set up WebSocket routes *)

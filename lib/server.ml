@@ -12,7 +12,7 @@ let games = Hashtbl.create (module Int)
 let next_id = ref 0
 
 let create_game config =
-  let new_game = Game.init config in
+  let new_game = Game.init (Hashtbl.length games) config in
   Hashtbl.add_exn
     games
     ~key:!next_id

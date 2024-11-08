@@ -17,6 +17,7 @@ depends: [
   "dream"
   "websocket"
   "websocket-lwt-unix"
+  "cohttp-lwt-unix"
   "atdgen"
   "lwt"
   "odoc" {with-doc}

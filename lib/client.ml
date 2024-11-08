@@ -47,7 +47,7 @@ let dist_sq (ax, ay) (bx, by) =
 
 let is_visible distance_sq view_radius_sq = distance_sq <= view_radius_sq
 
-let render ~me terminal Game.{ config; entities } =
+let render ~me terminal Game.{ config; entities; _ } =
   let entities_set =
     Map.of_list (List.map (fun entity -> Game.((entity.x, entity.y), entity)) entities)
   in
@@ -93,10 +93,18 @@ let receive client_id terminal message =
 ;;
 
 let run () =
-  let terminal = Term.create () in
-  let uri = Uri.of_string "http://127.0.0.1:7777/join/0" in
-  let send_player_input = send_player_input terminal in
-  let client_id = ref None in
-  let receive = receive client_id terminal in
-  Lwt_main.run (Ws_client.client uri receive send_player_input)
+  Lwt_main.run
+    (let open Lwt.Infix in
+     Rest_client.create_game Game.default_config
+     >>= function
+     | None -> failwith "Failed to create game"
+     | Some game ->
+       let uri =
+         Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game.game_id)
+       in
+       let terminal = Term.create () in
+       let send_player_input = send_player_input terminal in
+       let client_id = ref None in
+       let receive = receive client_id terminal in
+       Ws_client.client uri receive send_player_input)
 ;;

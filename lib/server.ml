@@ -24,29 +24,30 @@ let broadcast_game game_match =
   |> Lwt_list.iter_s (send (`Update game_match.state))
 ;;
 
-let create_game config =
-  let new_game = Game.init (Hashtbl.length games) config in
-  let thread game_id =
-    let game = find_game ~game_id in
-    let rec tick () =
-      let%lwt () = Lwt_unix.sleep game.state.config.tick_delta in
-      Dream.log "game %i as ticked" game_id;
-      let () =
-        Stdlib.Array.iteri
-          Stdlib.(
-            fun idx (maybe_move, _) ->
-              maybe_move
-              |> Option.map (fun move -> Game.move ~game:game.state ~id:idx ~move)
-              |> Option.join
-              |> Option.iter (fun new_game -> game.state <- new_game))
-          game.players
-      in
-      let%lwt () = broadcast_game game in
-      let () = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) game.players in
-      tick ()
+let thread game_id =
+  let game = find_game ~game_id in
+  let rec tick () =
+    let%lwt () = Lwt_unix.sleep game.state.config.tick_delta in
+    Dream.log "game %i as ticked" game_id;
+    let () =
+      Stdlib.Array.iteri
+        Stdlib.(
+          fun idx (maybe_move, _) ->
+            maybe_move
+            |> Option.map (fun move -> Game.move ~game:game.state ~id:idx ~move)
+            |> Option.join
+            |> Option.iter (fun new_game -> game.state <- new_game))
+        game.players
     in
+    let%lwt () = broadcast_game game in
+    let () = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) game.players in
     tick ()
   in
+  tick ()
+;;
+
+let create_game config =
+  let new_game = Game.init (Hashtbl.length games) config in
   Hashtbl.add_exn
     games
     ~key:!next_id

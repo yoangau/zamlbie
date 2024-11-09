@@ -21,14 +21,14 @@ let broadcast_game game_match =
   game_match.players
   |> Stdlib.Array.to_list
   |> Stdlib.List.filter_map (fun (_, w) -> w)
-  |> Lwt_list.iter_s (send (`Update game_match.state))
+  |> Lwt_list.iter_p (send (`Update game_match.state))
 ;;
 
 let thread game_id =
   let game = find_game ~game_id in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game.state.config.tick_delta in
-    Dream.log "game %i as ticked" game_id;
+    Dream.log "game %i has ticked" game_id;
     let () =
       Stdlib.Array.iteri
         Stdlib.(

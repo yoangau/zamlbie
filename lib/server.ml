@@ -4,14 +4,14 @@ open Lwt.Syntax
 
 type match_state =
   { players : (Game.move option * Dream.websocket option) array;
-    (* List of player connections *)
     mutable game_started : bool;
-    mutable state : Game.game (* Example game state *)
+    mutable state : Game.game
   }
 
 let games = Hashtbl.create (module Int)
+let find_game_exn ~game_id = Hashtbl.find_exn games game_id
+let find_game ~game_id = Hashtbl.find games game_id
 let next_id = ref 0
-let find_game ~game_id = Hashtbl.find_exn games game_id
 
 let send message socket =
   Dream.send socket @@ Message.Serializer.string_of_server_message message
@@ -25,22 +25,24 @@ let broadcast_game game_match =
 ;;
 
 let thread game_id =
-  let game = find_game ~game_id in
+  let execute_player_moves game =
+    Stdlib.Array.iteri
+      Stdlib.(
+        fun idx (maybe_move, _) ->
+          maybe_move
+          |> Option.map (fun move -> Game.move ~game:game.state ~id:idx ~move)
+          |> Option.join
+          |> Option.iter (fun new_game -> game.state <- new_game))
+      game.players
+  in
+  let empty_mailboxes = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) in
+  let game = find_game_exn ~game_id in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game.state.config.tick_delta in
     Dream.log "game %i has ticked" game_id;
-    let () =
-      Stdlib.Array.iteri
-        Stdlib.(
-          fun idx (maybe_move, _) ->
-            maybe_move
-            |> Option.map (fun move -> Game.move ~game:game.state ~id:idx ~move)
-            |> Option.join
-            |> Option.iter (fun new_game -> game.state <- new_game))
-        game.players
-    in
+    execute_player_moves game;
+    empty_mailboxes game.players;
     let%lwt () = broadcast_game game in
-    let () = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) game.players in
     tick ()
   in
   tick ()
@@ -98,11 +100,8 @@ let receive socket =
   | None -> Lwt_result.fail "No message received"
 ;;
 
-(* Function to broadcast game state to all players *)
-
-(* Handle each client WebSocket connection *)
-let handle_websocket_connection maybe_game player_socket =
-  match maybe_game with
+let handle_websocket_connection candidate_game_id player_socket =
+  match find_game ~game_id:candidate_game_id with
   | None -> send (`Rejected "Game not found!") player_socket
   | Some game_match ->
     (match try_join_match game_match player_socket with
@@ -121,12 +120,10 @@ let handle_websocket_connection maybe_game player_socket =
        input_loop ())
 ;;
 
-(* Set up WebSocket routes *)
 let run () =
   Dream.run ~error_handler:Dream.debug_error_handler ~interface:"0.0.0.0" ~port:7777
   @@ Dream.logger
   @@ Dream.router
-       (* TODO: Add parameter for game config width height n_player vision tick_speed*)
        [ (Dream.post "/create_game"
           @@ fun request ->
           let%lwt body = Dream.body request in
@@ -136,7 +133,6 @@ let run () =
          (Dream.get "/join/:id"
           @@ fun request ->
           let id = Dream.param request "id" |> Int.of_string in
-          let maybe_game = Hashtbl.find games id in
-          Dream.websocket @@ handle_websocket_connection maybe_game)
+          Dream.websocket @@ handle_websocket_connection id)
        ]
 ;;

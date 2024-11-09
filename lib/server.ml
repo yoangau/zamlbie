@@ -13,14 +13,40 @@ let games = Hashtbl.create (module Int)
 let next_id = ref 0
 let find_game ~game_id = Hashtbl.find_exn games game_id
 
+let send message socket =
+  Dream.send socket @@ Message.Serializer.string_of_server_message message
+;;
+
+let broadcast_game game_match =
+  game_match.players
+  |> Stdlib.Array.to_list
+  |> Stdlib.List.filter_map (fun (_, w) -> w)
+  |> Lwt_list.iter_s (send (`Update game_match.state))
+;;
+
 let create_game config =
   let new_game = Game.init (Hashtbl.length games) config in
-  (* let thread game_id =
-     let step () =
-     let game = find_game ~game_id in
-     let tick () = Lwt_unix.sleep game.config.tick_rate in
-     let List.map receive game.players
-  *)
+  let thread game_id =
+    let game = find_game ~game_id in
+    let rec tick () =
+      let%lwt () = Lwt_unix.sleep game.state.config.tick_delta in
+      Dream.log "game %i as ticked" game_id;
+      let () =
+        Stdlib.Array.iteri
+          Stdlib.(
+            fun idx (maybe_move, _) ->
+              maybe_move
+              |> Option.map (fun move -> Game.move ~game:game.state ~id:idx ~move)
+              |> Option.join
+              |> Option.iter (fun new_game -> game.state <- new_game))
+          game.players
+      in
+      let%lwt () = broadcast_game game in
+      let () = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) game.players in
+      tick ()
+    in
+    tick ()
+  in
   Hashtbl.add_exn
     games
     ~key:!next_id
@@ -29,11 +55,14 @@ let create_game config =
         game_started = true;
         state = new_game
       };
+  Lwt_preemptive.detach thread !next_id |> ignore;
   Int.incr next_id;
   new_game
 ;;
 
-let on_player_input ~game ~player_id move = Game.move ~game ~id:player_id ~move
+let on_player_input ~game ~player_id move =
+  game.players.(player_id) <- (Some move, snd game.players.(player_id))
+;;
 
 let get_player_count players =
   Stdlib.Array.fold_left
@@ -59,10 +88,6 @@ let try_join_match game_match player_socket =
     Some player_id)
 ;;
 
-let send message socket =
-  Dream.send socket @@ Message.Serializer.string_of_server_message message
-;;
-
 let receive socket =
   Dream.receive socket
   >>= function
@@ -73,13 +98,6 @@ let receive socket =
 ;;
 
 (* Function to broadcast game state to all players *)
-
-let broadcast_game game_match =
-  game_match.players
-  |> Stdlib.Array.to_list
-  |> Stdlib.List.filter_map (fun (_, w) -> w)
-  |> Lwt_list.iter_s (send (`Update game_match.state))
-;;
 
 (* Handle each client WebSocket connection *)
 let handle_websocket_connection maybe_game player_socket =
@@ -95,12 +113,8 @@ let handle_websocket_connection maybe_game player_socket =
          receive player_socket
          >>= function
          | Ok (`Move move) ->
-           (match on_player_input ~game:game_match.state ~player_id:client_id move with
-            | Some new_game ->
-              game_match.state <- new_game;
-              broadcast_game game_match |> Lwt.ignore_result;
-              input_loop ()
-            | None -> input_loop ())
+           on_player_input ~game:game_match ~player_id:client_id move;
+           input_loop ()
          | Error _ | _ -> Lwt.return ()
        in
        input_loop ())

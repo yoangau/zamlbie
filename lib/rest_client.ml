@@ -1,9 +1,8 @@
-let post body =
+let post url body =
   let open Lwt.Infix in
   let open Cohttp in
   let headers = Header.init_with "Content-Type" "application/json" in
   let body = Cohttp_lwt.Body.of_string body in
-  let url = Config.server_url ^ "/create_game" in
   Cohttp_lwt_unix.Client.post ~headers ~body (Uri.of_string url)
   >>= fun (resp, body) ->
   let status = resp |> Response.status |> Code.code_of_status in

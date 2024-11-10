@@ -100,13 +100,9 @@ let receive client_id terminal message =
   | `Rejected reason ->
     failwith reason |> ignore;
     Lwt.return ()
-  | `GameOver `Human ->
+  | `GameOver character ->
     let%lwt () = Term.release terminal in
-    print_endline "Human won!";
-    exit 0
-  | `GameOver `Zombie ->
-    let%lwt () = Term.release terminal in
-    print_endline "Zombie won!";
+    print_endline @@ Message.Serializer.string_of_character_type character ^ " won!";
     exit 0
   | `Misc message ->
     print_endline message;
@@ -115,13 +111,13 @@ let receive client_id terminal message =
 
 let create_game config =
   let open Lwt.Infix in
-  Rest_client.post (Game.Serializer.string_of_config config)
+  let url = Config.server_url ^ "/create_game" in
+  Rest_client.post url (Game.Serializer.string_of_config config)
   >>= fun x -> x |> Option.map Game.Serializer.game_of_string |> Lwt.return
 ;;
 
-let join_game game_id =
+let join_game terminal game_id =
   let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
-  let terminal = Term.create () in
   let send_player_input = send_player_input terminal in
   let client_id = ref None in
   let receive = receive client_id terminal in

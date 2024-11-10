@@ -18,7 +18,7 @@ let mailbox_move t player_id move =
 ;;
 
 let start t =
-  let start_game_state = Game.apply_start_rules t.state in
+  let start_game_state = Game.apply_start_effects t.state in
   update_game_state t start_game_state;
   Lwt_condition.signal t.started ()
 ;;

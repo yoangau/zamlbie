@@ -56,14 +56,23 @@ let render ~me terminal Game.{ config; entities; _ } =
   let entities_set =
     Map.of_list (List.map (fun entity -> Game.((entity.x, entity.y), entity)) entities)
   in
-  let Game.{ x = mx; y = my; _ } = List.find (fun e -> e.Game.id = me) entities in
+  let Game.{ x = mx; y = my; entity_type; _ } =
+    List.find (fun e -> e.Game.id = me) entities
+  in
+  let view_radius_sq =
+    let vr =
+      match entity_type with
+      | `Player `Human -> config.human_view_radius
+      | `Player `Zombie -> config.zombie_view_radius
+    in
+    vr * vr
+  in
   let image =
     I.tabulate (config.width * 2) config.height
     @@ fun x y ->
     let x = x / 2 in
     let distance_from_player = dist_sq (x, y) (mx, my) in
     (* TODO: use ally/enemy view_radius logic *)
-    let view_radius_sq = config.human_view_radius * config.human_view_radius in
     match Map.find_opt (x, y) entities_set with
     | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
       render_entity entity_type distance_from_player view_radius_sq

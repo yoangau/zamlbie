@@ -14,7 +14,7 @@ type config =
     view_radius_enemy : int;
     width : int;
     height : int;
-    player_count : int;
+    max_player_count : int;
     time_limit : int;
     tick_delta : float
   }

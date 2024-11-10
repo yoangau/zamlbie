@@ -37,6 +37,7 @@
   game
   game_j
   game_t
+  match
   message
   message_j
   message_t)

@@ -1,17 +1,12 @@
 open Notty
 open Notty_lwt
 
-let dot ratio : image =
-  let scale = 5.0 *. Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
-  I.uchar A.(bg (rgb ~r:(int_of_float scale) ~g:0 ~b:0)) (Uchar.of_char ' ') 1 1
-;;
-
 let hidden_background i : image =
   I.uchar A.(fg lightblack ++ bg black) (Uchar.of_int (0x2591 + i)) 1 1
 ;;
 
-let background ratio : image =
-  let scale = 23.0 *. Base.Float.clamp_exn ratio ~min:0.0 ~max:1.0 in
+let fog_gradient visibility_ratio : image =
+  let scale = 23.0 *. Base.Float.clamp_exn visibility_ratio ~min:0.0 ~max:1.0 in
   I.uchar A.(bg (gray @@ int_of_float scale)) (Uchar.of_int 0x2591) 1 1
 ;;
 
@@ -29,15 +24,25 @@ let fog_env distance_sq view_radius_sq =
   then (
     let distance = sqrt distance_sq in
     let view_radius = view_radius_sq |> sqrt in
-    background @@ ((distance -. view_radius) /. 20.0))
+    fog_gradient @@ ((distance -. view_radius) /. 20.0))
   else if distance_sq = view_radius_sq
   then hidden_background 0
   else visible_background
 ;;
 
-let render_agent distance_sq view_radius_sq =
-  let ratio = 1.0 -. (float_of_int distance_sq /. float_of_int view_radius_sq) in
-  dot (ratio *. ratio)
+let render_entity entity_type distance_sq view_radius_sq =
+  let visibility_ratio =
+    1.0 -. (float_of_int distance_sq /. float_of_int view_radius_sq)
+  in
+  let scale =
+    5.0 *. Base.Float.clamp_exn (visibility_ratio *. visibility_ratio) ~min:0.0 ~max:1.0
+  in
+  let color =
+    match entity_type with
+    | `Player `Human -> A.(rgb ~r:(int_of_float scale) ~g:0 ~b:0)
+    | `Player `Zombie -> A.(rgb ~r:0 ~g:(int_of_float scale) ~b:0)
+  in
+  I.uchar A.(bg color) (Uchar.of_char ' ') 1 1
 ;;
 
 let dist_sq (ax, ay) (bx, by) =
@@ -59,9 +64,10 @@ let render ~me terminal Game.{ config; entities; _ } =
     let distance_from_player = dist_sq (x, y) (mx, my) in
     (* TODO: use ally/enemy view_radius logic *)
     let view_radius_sq = config.human_view_radius * config.human_view_radius in
-    if Map.mem (x, y) entities_set && is_visible distance_from_player view_radius_sq
-    then render_agent distance_from_player view_radius_sq
-    else fog_env (float_of_int distance_from_player) view_radius_sq
+    match Map.find_opt (x, y) entities_set with
+    | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
+      render_entity entity_type distance_from_player view_radius_sq
+    | _ -> fog_env (float_of_int distance_from_player) view_radius_sq
   in
   Term.image terminal image
 ;;

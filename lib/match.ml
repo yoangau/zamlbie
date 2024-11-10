@@ -17,6 +17,12 @@ let mailbox_move t player_id move =
   t.players.(player_id) <- (Some move, snd t.players.(player_id))
 ;;
 
+let start t =
+  let start_game_state = Game.apply_start_rules t.state in
+  update_game_state t start_game_state;
+  Lwt_condition.signal t.started ()
+;;
+
 let try_join_match t player_socket =
   let room_size = t.state.config.max_player_count in
   let previous_player_count = player_count t in
@@ -29,7 +35,7 @@ let try_join_match t player_socket =
     then (
       t.players.(player_id) <- (None, Some player_socket);
       t.state <- Game.add_entity t.state { Game.default_entity with id = player_id });
-    if new_player_count = room_size then Lwt_condition.signal t.started ();
+    if new_player_count = room_size then start t;
     Some player_id)
 ;;
 

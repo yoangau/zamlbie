@@ -1,6 +1,8 @@
 include Game_t
 module Serializer = Game_j
 
+let () = Random.self_init ()
+
 let get_move_delta = function
   | `Up -> (0, -1)
   | `Down -> (0, 1)
@@ -48,7 +50,32 @@ let apply_start_effects game =
     let player_zombie_to_be = List.nth player_ids random_player_idx in
     update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
   in
-  let actions = [ zombie_sortition ] in
+  let distribute_players game =
+    let width, height = (game.config.width, game.config.height) in
+    let all_positions =
+      List.init width (fun x -> List.init height (fun y -> (x, y))) |> List.flatten
+    in
+    let shuffled_positions = List.sort (fun _ _ -> Random.int 3 - 1) all_positions in
+    List.iter (fun (x, y) -> Dream.log "(%i, %i)\n" x y) shuffled_positions;
+    let rec assign_positions entities positions =
+      match (entities, positions) with
+      | [], _ | _, [] -> []
+      | entity :: rest, pos :: pos_rest ->
+        let updated_entity = { entity with x = fst pos; y = snd pos } in
+        updated_entity :: assign_positions rest pos_rest
+    in
+    let players, others =
+      (List.partition
+         (fun e ->
+           match e.entity_type with
+           | `Player _ -> true
+           | _ -> false)
+         game.entities [@warning "-11"])
+    in
+    let updated_players = assign_positions players shuffled_positions in
+    { game with entities = updated_players @ others }
+  in
+  let actions = [ zombie_sortition; distribute_players ] in
   List.fold_left (fun game action -> action game) game actions
 ;;
 

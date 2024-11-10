@@ -33,6 +33,14 @@ let move ~game ~id ~move =
   Some (update_entity game { entity with x = nx; y = ny })
 ;;
 
+let zombie_sortition game = 
+ let player_ids = List.filter_map (fun e -> match e.entity_type with | `Player `Human -> Some (e) | _ -> None) game.entities in 
+ let player_count = List.length player_ids in 
+ let random_player_idx = Random.int (player_count + 1) in 
+ let player_zombie_to_be= List.nth player_ids random_player_idx in 	
+ update_entity game {player_zombie_to_be with entity_type = `Player `Zombie}
+
+
 let default_config =
   { human_view_radius = 5;
     zombie_view_radius = 5;

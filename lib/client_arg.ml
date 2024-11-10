@@ -4,13 +4,13 @@ type command =
 
 let parse_args () =
   let game_id = ref None in
-  let width = ref Game.default_config.width in
-  let height = ref Game.default_config.height in
-  let human_view_radius = ref Game.default_config.human_view_radius in
-  let zombie_view_radius = ref Game.default_config.zombie_view_radius in
-  let max_player_count = ref Game.default_config.max_player_count in
-  let time_limit = ref Game.default_config.time_limit in
-  let tick_delta = ref Game.default_config.tick_delta in
+  let width = ref Config.default_game_config.width in
+  let height = ref Config.default_game_config.height in
+  let human_view_radius = ref Config.default_game_config.human_view_radius in
+  let zombie_view_radius = ref Config.default_game_config.zombie_view_radius in
+  let max_player_count = ref Config.default_game_config.max_player_count in
+  let time_limit = ref Config.default_game_config.time_limit in
+  let tick_delta = ref Config.default_game_config.tick_delta in
   let mode = ref None in
   let specs =
     [ ( "--join",

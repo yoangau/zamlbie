@@ -33,6 +33,7 @@
   client
   ws_client
   rest_client
+  client_arg
   config
   game
   game_j

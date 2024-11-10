@@ -2,13 +2,6 @@ include Game_t
 module Serializer = Game_j
 
 let () = Random.self_init ()
-let next_id_gen = ref 0
-
-let next_id () =
-  let id = !next_id_gen in
-  Base.Int.incr next_id_gen;
-  id
-;;
 
 let get_move_delta = function
   | `Up -> (0, -1)
@@ -22,7 +15,7 @@ let is_entity a b = a.id = b.id
 let find_entity { entities; _ } id = List.find_opt (fun a -> a.id = id) entities
 
 let add_entity game entity =
-  let id = next_id () in
+  let id = Uuid.next_id () in
   (id, { game with entities = { entity with id } :: game.entities })
 ;;
 

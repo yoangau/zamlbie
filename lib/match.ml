@@ -53,6 +53,8 @@ module Registry = struct
     id
   ;;
 
+  let remove id = Hashtbl.remove matches id
+
   let new_match config thread =
     let match_id = next_id () in
     let new_game = Game.make match_id config in

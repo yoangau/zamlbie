@@ -33,7 +33,7 @@ let move ~game ~id ~move =
   Some (update_entity game { entity with x = nx; y = ny })
 ;;
 
-let apply_start_rules game =
+let apply_start_effects game =
   let zombie_sortition game =
     let player_ids =
       List.filter_map
@@ -48,7 +48,28 @@ let apply_start_rules game =
     let player_zombie_to_be = List.nth player_ids random_player_idx in
     update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
   in
-  zombie_sortition game (* could have other start rules *)
+  let actions = [ zombie_sortition ] in
+  List.fold_left (fun game action -> action game) game actions
+;;
+
+let apply_in_game_effects game =
+  let infection game =
+    let has_zombie_on_same_cell entity =
+      List.exists
+        (fun other ->
+          other.entity_type = `Player `Zombie && other.x = entity.x && other.y = entity.y)
+        game.entities
+    in
+    let infect entity =
+      match entity.entity_type with
+      | `Player `Human when has_zombie_on_same_cell entity ->
+        { entity with entity_type = `Player `Zombie }
+      | _ -> entity
+    in
+    { game with entities = List.map infect game.entities }
+  in
+  let actions = [ infection ] in
+  List.fold_left (fun game action -> action game) game actions
 ;;
 
 type game_ended =

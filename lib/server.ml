@@ -16,14 +16,17 @@ let receive socket =
   | None -> Lwt_result.fail "No message received"
 ;;
 
-let broadcast players message =
+let players_ws_iter ~f players =
   players
   |> Stdlib.Array.to_list
   |> Stdlib.List.filter_map (fun (_, w) -> w)
-  |> Lwt_list.iter_p (send message)
+  |> Lwt_list.iter_p f
 ;;
 
-let game_orchestrator match_id =
+let broadcast players message = players_ws_iter ~f:(send message) players
+let close_ws players = players_ws_iter ~f:Dream.close_websocket players
+
+let match_orchestrator match_id =
   let execute_player_moves game_match =
     Stdlib.Array.iteri
       Stdlib.(
@@ -47,8 +50,11 @@ let game_orchestrator match_id =
     let%lwt () = broadcast game_match.players (`Update game_match.state) in
     match Game.verify_end_conditions game_match.state start_time with
     | None -> tick ()
-    | Some (Win who) -> broadcast game_match.players (`GameOver who)
     | Some (Other _) -> assert false (* future other end state? *)
+    | Some (Win who) ->
+      Match.Registry.remove match_id;
+      let%lwt () = broadcast game_match.players (`GameOver who) in
+      close_ws game_match.players
   in
   tick ()
 ;;
@@ -81,7 +87,7 @@ let run () =
           @@ fun request ->
           let%lwt body = Dream.body request in
           let config = Game.Serializer.config_of_string body in
-          let game_match = Match.Registry.new_match config game_orchestrator in
+          let game_match = Match.Registry.new_match config match_orchestrator in
           Dream.respond (Game.Serializer.string_of_game game_match));
          (Dream.get "/join/:id"
           @@ fun request ->

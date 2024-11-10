@@ -57,7 +57,7 @@ let dist_sq (ax, ay) (bx, by) =
 let is_visible distance_sq view_radius_sq = distance_sq <= view_radius_sq
 
 let is_outside (x, y) config =
-  x < 0 || x > config.Game.width || y < 0 || y > config.height
+  x < 0 || x >= config.Game.width || y < 0 || y >= config.height
 ;;
 
 let render ~me terminal Game.{ config; entities; _ } =

@@ -1,3 +1,5 @@
+module HashtblKey = Base.Int
+
 let next_id_gen = ref 0
 
 let next_id () =

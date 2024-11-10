@@ -38,10 +38,10 @@ let default_config =
     view_radius_enemy = 5;
     width = 20;
     height = 20;
-    player_count = 2;
+    max_player_count = 2;
     time_limit = 60;
     tick_delta = 0.5
   }
 ;;
 
-let init game_id config = { game_id; entities = []; config }
+let make game_id config = { game_id; entities = []; config }

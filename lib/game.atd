@@ -1,4 +1,4 @@
-type character_type = [ Ally | Enemy ]
+type character_type = [ Human | Zombie ]
 
 type entity_type = [ Player of character_type ]
 

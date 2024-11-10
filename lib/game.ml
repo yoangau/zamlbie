@@ -8,7 +8,7 @@ let get_move_delta = function
   | `Right -> (1, 0)
 ;;
 
-let default_entity = { id = 0; entity_type = `Player `Ally; x = 0; y = 0 }
+let default_entity = { id = 0; entity_type = `Player `Human; x = 0; y = 0 }
 let is_entity a b = a.id = b.id
 let find_entity { entities; _ } id = List.find_opt (fun a -> a.id = id) entities
 let add_entity game entity = { game with entities = entity :: game.entities }
@@ -32,6 +32,14 @@ let move ~game ~id ~move =
   in
   Some (update_entity game { entity with x = nx; y = ny })
 ;;
+
+let zombie_sortition game = 
+ let player_ids = List.filter_map (fun e -> match e.entity_type with | `Player `Human -> Some (e) | _ -> None) game.entities in 
+ let player_count = List.length player_ids in 
+ let random_player_idx = Random.int (player_count + 1) in 
+ let player_zombie_to_be= List.nth player_ids random_player_idx in 	
+ update_entity game {player_zombie_to_be with entity_type = `Player `Zombie}
+
 
 let default_config =
   { view_radius_ally = 5;

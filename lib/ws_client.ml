@@ -41,11 +41,8 @@ let client uri receive send =
         >>= fun () ->
         close_sent := true;
         Lwt.return_unit
-      | Some (`Move _ as move) ->
-        write
-          conn
-          (Frame.create ~content:(Message.Serializer.string_of_client_message move) ())
-        >>= fun _ -> Lwt.return_unit
+      | Some (`Message message) ->
+        write conn (Frame.create ~content:message ()) >>= fun _ -> Lwt.return_unit
       | _ -> Lwt.return_unit)
   in
   [ pushf (); Lwt_stream.from react ]

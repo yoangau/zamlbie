@@ -72,7 +72,6 @@ let render ~me terminal Game.{ config; entities; _ } =
     @@ fun x y ->
     let x = x / 2 in
     let distance_from_player = dist_sq (x, y) (mx, my) in
-    (* TODO: use ally/enemy view_radius logic *)
     match Map.find_opt (x, y) entities_set with
     | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
       render_entity entity_type distance_from_player view_radius_sq
@@ -84,7 +83,9 @@ let render ~me terminal Game.{ config; entities; _ } =
 let send_player_input terminal () =
   Lwt_stream.map_s
     (function
-      | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Move move)
+      | `Key (`Arrow move, []) ->
+        Lwt.return
+        @@ Some (`Message (Message.Serializer.string_of_client_message @@ `Move move))
       | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
       | _ -> Lwt.return @@ None)
     (Term.events terminal)
@@ -110,6 +111,12 @@ let receive client_id terminal message =
   | `Misc message ->
     print_endline message;
     Lwt.return ()
+;;
+
+let create_game config =
+  let open Lwt.Infix in
+  Rest_client.post (Game.Serializer.string_of_config config)
+  >>= fun x -> x |> Option.map Game.Serializer.game_of_string |> Lwt.return
 ;;
 
 let join_game game_id =

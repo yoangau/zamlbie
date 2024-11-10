@@ -58,7 +58,7 @@ let render ~me terminal Game.{ config; entities; _ } =
     let x = x / 2 in
     let distance_from_player = dist_sq (x, y) (mx, my) in
     (* TODO: use ally/enemy view_radius logic *)
-    let view_radius_sq = config.view_radius_ally * config.view_radius_ally in
+    let view_radius_sq = config.human_view_radius * config.human_view_radius in
     if Map.mem (x, y) entities_set && is_visible distance_from_player view_radius_sq
     then render_agent distance_from_player view_radius_sq
     else fog_env (float_of_int distance_from_player) view_radius_sq

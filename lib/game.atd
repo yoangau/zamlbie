@@ -10,8 +10,8 @@ type entity =
   }
 
 type config =
-  { view_radius_ally : int;
-    view_radius_enemy : int;
+  { human_view_radius : int;
+    zombie_view_radius : int;
     width : int;
     height : int;
     max_player_count : int;

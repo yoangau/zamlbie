@@ -42,8 +42,8 @@ let zombie_sortition game =
 
 
 let default_config =
-  { view_radius_ally = 5;
-    view_radius_enemy = 5;
+  { human_view_radius = 5;
+    zombie_view_radius = 5;
     width = 20;
     height = 20;
     max_player_count = 2;

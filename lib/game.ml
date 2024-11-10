@@ -36,7 +36,17 @@ let move ~game ~id ~move =
     ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.config.width - 1),
       Base.Int.clamp_exn (entity.y + dy) ~min:0 ~max:(game.config.height - 1) )
   in
-  Some (update_entity game { entity with x = nx; y = ny })
+  let walls =
+    List.filter_map
+      (fun e ->
+        match e.entity_type with
+        | `Environment `Wall -> Some (e.x, e.y)
+        | _ -> None)
+      game.entities
+  in
+  if List.mem (nx, ny) walls
+  then None
+  else Some (update_entity game { entity with x = nx; y = ny })
 ;;
 
 let apply_start_effects game =
@@ -56,10 +66,22 @@ let apply_start_effects game =
   in
   let distribute_players game =
     let width, height = (game.config.width, game.config.height) in
-    let all_positions =
-      List.init width (fun x -> List.init height (fun y -> (x, y))) |> List.flatten
+    let rec generate_unique_position occupied_positions =
+      let x = Random.int width in
+      let y = Random.int height in
+      let pos = (x, y) in
+      if List.mem pos occupied_positions
+      then generate_unique_position occupied_positions
+      else pos
     in
-    let shuffled_positions = List.sort (fun _ _ -> Random.int 3 - 1) all_positions in
+    let all_positions =
+      List.fold_left
+        (fun acc _ ->
+          let unique_pos = generate_unique_position acc in
+          unique_pos :: acc)
+        []
+        game.entities
+    in
     let rec assign_positions entities positions =
       match (entities, positions) with
       | [], _ | _, [] -> []
@@ -75,7 +97,7 @@ let apply_start_effects game =
           | _ -> false)
         game.entities
     in
-    let updated_players = assign_positions players shuffled_positions in
+    let updated_players = assign_positions players all_positions in
     { game with entities = updated_players @ others }
   in
   let add_walls game =

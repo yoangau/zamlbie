@@ -41,6 +41,8 @@ let render_entity entity_type distance_sq view_radius_sq =
     match entity_type with
     | `Player `Human -> A.(rgb ~r:(int_of_float scale) ~g:0 ~b:0)
     | `Player `Zombie -> A.(rgb ~r:0 ~g:(int_of_float scale) ~b:0)
+    | `Environment `Wall -> A.(white)
+    | `Environment `Glass -> A.(blue)
   in
   I.uchar A.(bg color) (Uchar.of_char ' ') 1 1
 ;;
@@ -64,6 +66,7 @@ let render ~me terminal Game.{ config; entities; _ } =
       match entity_type with
       | `Player `Human -> config.human_view_radius
       | `Player `Zombie -> config.zombie_view_radius
+      | _ -> failwith "Player should be Player type"
     in
     vr * vr
   in

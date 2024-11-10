@@ -16,45 +16,41 @@ let receive socket =
   | None -> Lwt_result.fail "No message received"
 ;;
 
-let players_ws_iter ~f players =
-  players
-  |> Stdlib.Array.to_list
-  |> Stdlib.List.filter_map (fun (_, w) -> w)
-  |> Lwt_list.iter_p f
-;;
-
-let broadcast players message = players_ws_iter ~f:(send message) players
-let close_ws players = players_ws_iter ~f:Dream.close_websocket players
+let broadcast message = Match.players_ws_iter ~f:(fun ws -> send message ws |> ignore)
+let close_ws = Match.players_ws_iter ~f:(fun ws -> Dream.close_websocket ws |> ignore)
 
 let match_orchestrator match_id =
   let execute_player_moves game_match =
-    Stdlib.Array.iteri
-      Stdlib.(
-        fun idx (maybe_move, _) ->
-          maybe_move
-          |> Option.map (fun move -> Game.move ~game:game_match.state ~id:idx ~move)
-          |> Option.join
-          |> Option.iter (Match.update_game_state game_match))
-      game_match.players
+    Hashtbl.iteri
+      game_match.Match.players
+      ~f:
+        Stdlib.(
+          fun ~key:id ~data:{ mailbox; _ } ->
+            mailbox
+            |> Option.map (fun move -> Game.move ~game:game_match.state ~id ~move)
+            |> Option.join
+            |> Option.iter (Match.update_game_state game_match))
   in
-  let empty_mailboxes = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) in
+  let empty_mailboxes players =
+    Hashtbl.iter players ~f:(fun coms -> coms.Match.mailbox <- None)
+  in
   let game_match = Match.Registry.find_exn match_id in
   let%lwt () = Lwt_condition.wait game_match.started in
-  let%lwt () = broadcast game_match.players (`Update game_match.state) in
+  broadcast (`Update game_match.state) game_match;
   let start_time = Unix.time () in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
     empty_mailboxes game_match.players;
     Game.apply_in_game_effects game_match.state |> Match.update_game_state game_match;
-    let%lwt () = broadcast game_match.players (`Update game_match.state) in
+    broadcast (`Update game_match.state) game_match;
     match Game.verify_end_conditions game_match.state start_time with
     | None -> tick ()
     | Some (Other _) -> assert false (* future other end state? *)
     | Some (Win who) ->
       Match.Registry.remove match_id;
-      let%lwt () = broadcast game_match.players (`GameOver who) in
-      close_ws game_match.players
+      broadcast (`GameOver who) game_match;
+      Lwt.return_unit
   in
   tick ()
 ;;

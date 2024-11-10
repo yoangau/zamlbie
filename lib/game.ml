@@ -116,14 +116,10 @@ type game_ended =
 let verify_end_conditions game start_time =
   let all_zombie entities =
     entities
-    |> List.filter (fun e ->
-      match e.entity_type with
-      | `Player _ -> true
-      | _ -> false)
     |> List.for_all (fun e ->
       match e.entity_type with
-      | `Player `Zombie -> true
-      | _ -> false)
+      | `Player `Human -> false
+      | _ -> true)
   in
   let now = Unix.time () in
   if int_of_float (now -. start_time) >= game.config.time_limit
@@ -145,20 +141,33 @@ let default_config =
 ;;
 
 let make game_id config =
+  (* random to begin, sophisticaed algo later *)
   let walls =
     let width, height = (config.width, config.height) in
     let create_wall x y =
       { default_entity with x; y; entity_type = `Environment `Wall }
     in
-    let top_bottom_walls =
-      List.init width (fun x -> create_wall x 0)
-      @ List.init width (fun x -> create_wall x (height - 1))
+    let rec generate_random_walls n acc =
+      if n <= 0
+      then acc
+      else (
+        let x = Random.int width in
+        let y = Random.int height in
+        let orientation = Random.int 2 in
+        let length = Random.int 4 + 2 in
+        let new_wall =
+          match orientation with
+          | 0 ->
+            List.init length (fun i ->
+              if x + i < width then create_wall (x + i) y else create_wall x y)
+          | _ ->
+            List.init length (fun i ->
+              if y + i < height then create_wall x (y + i) else create_wall x y)
+        in
+        generate_random_walls (n - 1) (new_wall @ acc))
     in
-    let left_right_walls =
-      List.init (height - 2) (fun y -> create_wall 0 (y + 1))
-      @ List.init (height - 2) (fun y -> create_wall (width - 1) (y + 1))
-    in
-    top_bottom_walls @ left_right_walls
+    let num_random_walls = 10 in
+    generate_random_walls num_random_walls []
   in
   let game = { game_id; entities = []; config } in
   List.fold_left (fun game wall -> add_entity game wall |> snd) game walls

@@ -68,17 +68,52 @@ let apply_start_effects game =
         updated_entity :: assign_positions rest pos_rest
     in
     let players, others =
-      (List.partition
-         (fun e ->
-           match e.entity_type with
-           | `Player _ -> true
-           | _ -> false)
-         game.entities [@warning "-11"])
+      List.partition
+        (fun e ->
+          match e.entity_type with
+          | `Player _ -> true
+          | _ -> false)
+        game.entities
     in
     let updated_players = assign_positions players shuffled_positions in
     { game with entities = updated_players @ others }
   in
-  let actions = [ zombie_sortition; distribute_players ] in
+  let add_walls game =
+    let occupied_positions = List.map (fun e -> (e.x, e.y)) game.entities in
+    let is_already_occupied xy = List.mem xy occupied_positions in
+    let width, height = (game.config.width, game.config.height) in
+    let create_wall x y =
+      { default_entity with x; y; entity_type = `Environment `Wall }
+    in
+    let rec generate_random_walls n acc =
+      if n <= 0
+      then acc
+      else (
+        let x = Random.int width in
+        let y = Random.int height in
+        let orientation = Random.int 2 in
+        let length = Random.int 4 + 2 in
+        let new_wall =
+          (match orientation with
+           | 0 ->
+             List.init length (fun i ->
+               if x + i < width && not (is_already_occupied (x + i, y))
+               then Some (create_wall (x + i) y)
+               else None)
+           | _ ->
+             List.init length (fun i ->
+               if y + i < height && not (is_already_occupied (x, y + i))
+               then Some (create_wall x (y + i))
+               else None))
+          |> List.filter_map Fun.id
+        in
+        generate_random_walls (n - 1) (new_wall @ acc))
+    in
+    let num_random_walls = 10 in
+    let walls = generate_random_walls num_random_walls [] in
+    List.fold_left (fun game wall -> add_entity game wall |> snd) game walls
+  in
+  let actions = [ zombie_sortition; distribute_players; add_walls ] in
   List.fold_left (fun game action -> action game) game actions
 ;;
 
@@ -122,35 +157,4 @@ let verify_end_conditions game start_time =
   else None
 ;;
 
-let make game_id config =
-  (* random to begin, sophisticaed algo later *)
-  let walls =
-    let width, height = (config.width, config.height) in
-    let create_wall x y =
-      { default_entity with x; y; entity_type = `Environment `Wall }
-    in
-    let rec generate_random_walls n acc =
-      if n <= 0
-      then acc
-      else (
-        let x = Random.int width in
-        let y = Random.int height in
-        let orientation = Random.int 2 in
-        let length = Random.int 4 + 2 in
-        let new_wall =
-          match orientation with
-          | 0 ->
-            List.init length (fun i ->
-              if x + i < width then create_wall (x + i) y else create_wall x y)
-          | _ ->
-            List.init length (fun i ->
-              if y + i < height then create_wall x (y + i) else create_wall x y)
-        in
-        generate_random_walls (n - 1) (new_wall @ acc))
-    in
-    let num_random_walls = 10 in
-    generate_random_walls num_random_walls []
-  in
-  let game = { game_id; entities = []; config } in
-  List.fold_left (fun game wall -> add_entity game wall |> snd) game walls
-;;
+let make game_id config = { game_id; entities = []; config }

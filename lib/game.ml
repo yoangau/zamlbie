@@ -49,8 +49,8 @@ let apply_start_rules game =
 ;;
 
 let default_config =
-  { human_view_radius = 5;
-    zombie_view_radius = 5;
+  { human_view_radius = 8;
+    zombie_view_radius = 4;
     width = 20;
     height = 20;
     max_player_count = 2;

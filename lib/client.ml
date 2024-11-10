@@ -113,7 +113,7 @@ let create_game config =
   let open Lwt.Infix in
   let url = Config.server_url ^ "/create_game" in
   Rest_client.post url (Game.Serializer.string_of_config config)
-  >>= fun x -> x |> Option.map Game.Serializer.game_of_string |> Lwt.return
+  >>= fun s -> Option.map Game.Serializer.game_of_string s |> Lwt.return
 ;;
 
 let join_game terminal game_id =

@@ -56,7 +56,6 @@ let apply_start_effects game =
       List.init width (fun x -> List.init height (fun y -> (x, y))) |> List.flatten
     in
     let shuffled_positions = List.sort (fun _ _ -> Random.int 3 - 1) all_positions in
-    List.iter (fun (x, y) -> Dream.log "(%i, %i)\n" x y) shuffled_positions;
     let rec assign_positions entities positions =
       match (entities, positions) with
       | [], _ | _, [] -> []

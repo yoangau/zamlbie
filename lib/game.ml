@@ -34,18 +34,21 @@ let move ~game ~id ~move =
 ;;
 
 let apply_start_rules game =
-  let player_ids =
-    List.filter_map
-      (fun e ->
-        match e.entity_type with
-        | `Player `Human -> Some e
-        | _ -> None)
-      game.entities
+  let zombie_sortition game =
+    let player_ids =
+      List.filter_map
+        (fun e ->
+          match e.entity_type with
+          | `Player `Human -> Some e
+          | _ -> None)
+        game.entities
+    in
+    let player_count = List.length player_ids in
+    let random_player_idx = Random.int player_count in
+    let player_zombie_to_be = List.nth player_ids random_player_idx in
+    update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
   in
-  let player_count = List.length player_ids in
-  let random_player_idx = Random.int player_count in
-  let player_zombie_to_be = List.nth player_ids random_player_idx in
-  update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
+  zombie_sortition game (* could have other start rules *)
 ;;
 
 type game_ended =

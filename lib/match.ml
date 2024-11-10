@@ -1,21 +1,25 @@
+open Base
+
+type player_t =
+  { websocket : Dream.websocket;
+    mutable mailbox : Game.move option
+  }
+
 type t =
-  { players : (Game.move option * Dream.websocket option) array;
+  { players : (Int.t, player_t) Hashtbl.t;
     started : unit Lwt_condition.t;
     mutable state : Game.game
   }
 
 let update_game_state t new_state = t.state <- new_state
-
-let player_count t =
-  Stdlib.Array.fold_left
-    (fun acc (_, s) -> acc + if Option.is_some s then 1 else 0)
-    0
-    t.players
-;;
+let player_count t = Hashtbl.length t.players
 
 let mailbox_move t player_id move =
-  t.players.(player_id) <- (Some move, snd t.players.(player_id))
+  Hashtbl.find t.players player_id
+  |> Stdlib.Option.iter (fun player -> player.mailbox <- Some move)
 ;;
+
+let players_ws_iter t ~f = Hashtbl.iter t.players ~f:(fun { websocket; _ } -> f websocket)
 
 let start t =
   let start_game_state = Game.apply_start_effects t.state in
@@ -23,18 +27,18 @@ let start t =
   Lwt_condition.signal t.started ()
 ;;
 
-let try_join_match t player_socket =
+let try_join_match t websocket =
   let room_size = t.state.config.max_player_count in
   let previous_player_count = player_count t in
   let new_player_count = previous_player_count + 1 in
-  let player_id = previous_player_count in
-  if previous_player_count = room_size
+  if previous_player_count >= room_size
   then None
   else (
-    if previous_player_count < room_size
-    then (
-      t.players.(player_id) <- (None, Some player_socket);
-      t.state <- Game.add_entity t.state { Game.default_entity with id = player_id });
+    let player_id, game =
+      Game.add_entity t.state { Game.default_entity with entity_type = `Player `Human }
+    in
+    t.state <- game;
+    Hashtbl.set t.players ~key:player_id ~data:{ websocket; mailbox = None };
     if new_player_count = room_size then start t;
     Some player_id)
 ;;
@@ -62,7 +66,7 @@ module Registry = struct
       matches
       ~key:match_id
       ~data:
-        { players = Stdlib.Array.make new_game.config.max_player_count (None, None);
+        { players = Hashtbl.create (module Int);
           started = Lwt_condition.create ();
           state = new_game
         };

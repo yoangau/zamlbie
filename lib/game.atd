@@ -1,6 +1,8 @@
 type character_type = [ Human | Zombie ]
 
-type entity_type = [ Player of character_type ]
+type environment_type = [ Wall | Glass ]
+
+type entity_type = [ Player of character_type | Environment of environment_type ]
 
 type entity =
   { entity_type : entity_type;

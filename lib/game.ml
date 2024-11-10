@@ -2,6 +2,13 @@ include Game_t
 module Serializer = Game_j
 
 let () = Random.self_init ()
+let next_id_gen = ref 0
+
+let next_id () =
+  let id = !next_id_gen in
+  Base.Int.incr next_id_gen;
+  id
+;;
 
 let get_move_delta = function
   | `Up -> (0, -1)
@@ -13,7 +20,11 @@ let get_move_delta = function
 let default_entity = { id = 0; entity_type = `Player `Human; x = 0; y = 0 }
 let is_entity a b = a.id = b.id
 let find_entity { entities; _ } id = List.find_opt (fun a -> a.id = id) entities
-let add_entity game entity = { game with entities = entity :: game.entities }
+
+let add_entity game entity =
+  let id = next_id () in
+  (id, { game with entities = { entity with id } :: game.entities })
+;;
 
 let update_entity game new_entity =
   { game with
@@ -103,7 +114,17 @@ type game_ended =
   | Other of string
 
 let verify_end_conditions game start_time =
-  let all_zombie = List.for_all (fun e -> e.entity_type = `Player `Zombie) in
+  let all_zombie entities =
+    entities
+    |> List.filter (fun e ->
+      match e.entity_type with
+      | `Player _ -> true
+      | _ -> false)
+    |> List.for_all (fun e ->
+      match e.entity_type with
+      | `Player `Zombie -> true
+      | _ -> false)
+  in
   let now = Unix.time () in
   if int_of_float (now -. start_time) >= game.config.time_limit
   then Some (Win `Human)
@@ -115,12 +136,30 @@ let verify_end_conditions game start_time =
 let default_config =
   { human_view_radius = 8;
     zombie_view_radius = 4;
-    width = 20;
-    height = 20;
+    width = 40;
+    height = 40;
     max_player_count = 2;
-    time_limit = 60;
+    time_limit = 10;
     tick_delta = 0.5
   }
 ;;
 
-let make game_id config = { game_id; entities = []; config }
+let make game_id config =
+  let walls =
+    let width, height = (config.width, config.height) in
+    let create_wall x y =
+      { default_entity with x; y; entity_type = `Environment `Wall }
+    in
+    let top_bottom_walls =
+      List.init width (fun x -> create_wall x 0)
+      @ List.init width (fun x -> create_wall x (height - 1))
+    in
+    let left_right_walls =
+      List.init (height - 2) (fun y -> create_wall 0 (y + 1))
+      @ List.init (height - 2) (fun y -> create_wall (width - 1) (y + 1))
+    in
+    top_bottom_walls @ left_right_walls
+  in
+  let game = { game_id; entities = []; config } in
+  List.fold_left (fun game wall -> add_entity game wall |> snd) game walls
+;;

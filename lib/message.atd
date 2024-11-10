@@ -1,10 +1,10 @@
 type game <ocaml from="Game"> = abstract
 type move <ocaml from="Game"> = abstract
-
+type character_type <ocaml from="Game"> = abstract
 
 type server_message = [ 
     | Update of game
-    | GameOver
+    | GameOver of character_type
     | Misc of string
     | Joined of int
     | Rejected of string

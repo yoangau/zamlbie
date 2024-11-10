@@ -8,7 +8,7 @@ let get_move_delta = function
   | `Right -> (1, 0)
 ;;
 
-let default_entity = { id = 0; entity_type = `Player `Ally; x = 0; y = 0 }
+let default_entity = { id = 0; entity_type = `Player `Human; x = 0; y = 0 }
 let is_entity a b = a.id = b.id
 let find_entity { entities; _ } id = List.find_opt (fun a -> a.id = id) entities
 let add_entity game entity = { game with entities = entity :: game.entities }
@@ -34,8 +34,8 @@ let move ~game ~id ~move =
 ;;
 
 let default_config =
-  { view_radius_ally = 5;
-    view_radius_enemy = 5;
+  { human_view_radius = 5;
+    zombie_view_radius = 5;
     width = 20;
     height = 20;
     max_player_count = 2;

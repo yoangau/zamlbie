@@ -37,7 +37,7 @@ let parse_args () =
         "Tick delta time in seconds (default 0.5)" )
     ]
   in
-  let usage_msg = "Usage: myprogram.exe [--join <int> | --create [options]]" in
+  let usage_msg = "Usage: client [--join <int> | --create [options]]" in
   Arg.parse specs (fun _ -> ()) usage_msg;
   match !mode with
   | Some "join" ->

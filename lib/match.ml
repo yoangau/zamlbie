@@ -1,6 +1,6 @@
 type t =
   { players : (Game.move option * Dream.websocket option) array;
-    mutable started : bool;
+    started : unit Lwt_condition.t;
     mutable state : Game.game
   }
 
@@ -29,7 +29,7 @@ let try_join_match t player_socket =
     then (
       t.players.(player_id) <- (None, Some player_socket);
       t.state <- Game.add_entity t.state { Game.default_entity with id = player_id });
-    if new_player_count = room_size then t.started <- true;
+    if new_player_count = room_size then Lwt_condition.signal t.started ();
     Some player_id)
 ;;
 
@@ -55,7 +55,7 @@ module Registry = struct
       ~key:match_id
       ~data:
         { players = Stdlib.Array.make new_game.config.max_player_count (None, None);
-          started = true;
+          started = Lwt_condition.create ();
           state = new_game
         };
     Lwt_preemptive.detach thread match_id |> ignore;

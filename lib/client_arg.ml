@@ -22,10 +22,12 @@ let parse_args () =
       ("--create", Arg.Unit (fun () -> mode := Some "create"), "Create a new game");
       ("--width", Arg.Set_int width, "Width of the game (default 20)");
       ("--height", Arg.Set_int height, "Height of the game (default 20)");
-      ("--ally-view-radius", Arg.Set_int human_view_radius, "Ally view radius (default 5)");
-      ( "--enemy-view-radius",
+      ( "--human-view-radius",
+        Arg.Set_int human_view_radius,
+        "Human view radius (default 5)" );
+      ( "--zombie-view-radius",
         Arg.Set_int zombie_view_radius,
-        "Enemy view radius (default 5)" );
+        "Zombie view radius (default 5)" );
       ( "--max-player-count",
         Arg.Set_int max_player_count,
         "Maximum number of players (default 2)" );

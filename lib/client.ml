@@ -55,6 +55,7 @@ let dist_sq (ax, ay) (bx, by) =
 let is_visible distance_sq view_radius_sq = distance_sq <= view_radius_sq
 
 let render ~me terminal Game.{ config; entities; _ } =
+  let window_height, window_width = (20, 20) in
   let entities_set =
     Map.of_list (List.map (fun entity -> Game.((entity.x, entity.y), entity)) entities)
   in
@@ -71,11 +72,13 @@ let render ~me terminal Game.{ config; entities; _ } =
     vr * vr
   in
   let image =
-    I.tabulate (config.width * 2) config.height
-    @@ fun x y ->
-    let x = x / 2 in
-    let distance_from_player = dist_sq (x, y) (mx, my) in
-    match Map.find_opt (x, y) entities_set with
+    I.tabulate (window_width * 2) window_height
+    @@ fun wx wy ->
+    let wx = wx / 2 in
+    let gx = mx + wx - (window_width / 2) in
+    let gy = my + wy - (window_height / 2) in
+    let distance_from_player = dist_sq (gx, gy) (mx, my) in
+    match Map.find_opt (gx, gy) entities_set with
     | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
       render_entity entity_type distance_from_player view_radius_sq
     | _ -> fog_env (float_of_int distance_from_player) view_radius_sq

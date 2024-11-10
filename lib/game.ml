@@ -136,10 +136,10 @@ let verify_end_conditions game start_time =
 let default_config =
   { human_view_radius = 8;
     zombie_view_radius = 4;
-    width = 40;
-    height = 40;
+    width = 20;
+    height = 20;
     max_player_count = 2;
-    time_limit = 10;
+    time_limit = 30;
     tick_delta = 0.5
   }
 ;;

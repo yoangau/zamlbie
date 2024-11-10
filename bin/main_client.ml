@@ -6,7 +6,7 @@ let () =
     match Client_arg.parse_args () with
     | Ok (Client_arg.Join id) -> Client.join_game id
     | Ok (Client_arg.Create config) ->
-      Rest_client.create_game config
+      Client.create_game config
       >>= (function
        | None -> failwith "Game creation failed!"
        | Some game -> Client.join_game game.game_id)

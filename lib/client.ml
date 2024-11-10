@@ -99,9 +99,14 @@ let receive client_id terminal message =
   | `Rejected reason ->
     failwith reason |> ignore;
     Lwt.return ()
-  | `GameOver ->
-    exit 0 |> ignore;
-    Lwt.return ()
+  | `GameOver `Human ->
+    let%lwt () = Term.release terminal in
+    print_endline "Human won!";
+    exit 0
+  | `GameOver `Zombie ->
+    let%lwt () = Term.release terminal in
+    print_endline "Zombie won!";
+    exit 0
   | `Misc message ->
     print_endline message;
     Lwt.return ()

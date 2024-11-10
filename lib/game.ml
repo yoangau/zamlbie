@@ -48,6 +48,20 @@ let apply_start_rules game =
   update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
 ;;
 
+type game_ended =
+  | Win of character_type
+  | Other of string
+
+let verify_end_conditions game start_time =
+  let all_zombie = List.for_all (fun e -> e.entity_type = `Player `Zombie) in
+  let now = Unix.time () in
+  if int_of_float (now -. start_time) >= game.config.time_limit
+  then Some (Win `Human)
+  else if all_zombie game.entities
+  then Some (Win `Zombie)
+  else None
+;;
+
 let default_config =
   { human_view_radius = 8;
     zombie_view_radius = 4;

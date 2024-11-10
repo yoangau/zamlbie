@@ -36,6 +36,7 @@ let game_orchestrator match_id =
   in
   let empty_mailboxes = Stdlib.Array.map_inplace (fun (_, ws) -> (None, ws)) in
   let game_match = Match.Registry.find_exn match_id in
+  let%lwt () = Lwt_condition.wait game_match.started in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;

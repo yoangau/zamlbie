@@ -6,7 +6,7 @@ type player_t =
   }
 
 type t =
-  { players : (Int.t, player_t) Hashtbl.t;
+  { players : (Uuid.HashtblKey.t, player_t) Hashtbl.t;
     started : unit Lwt_condition.t;
     mutable state : Game.game
   }
@@ -46,7 +46,7 @@ let try_join_match t websocket =
 module Registry = struct
   open Base
 
-  let matches : (Int.t, t) Hashtbl.t = Hashtbl.create (module Int)
+  let matches = Hashtbl.create (module Uuid.HashtblKey)
   let find_exn id = Hashtbl.find_exn matches id
   let find id = Hashtbl.find matches id
   let remove id = Hashtbl.remove matches id
@@ -58,7 +58,7 @@ module Registry = struct
       matches
       ~key:match_id
       ~data:
-        { players = Hashtbl.create (module Int);
+        { players = Hashtbl.create (module Uuid.HashtblKey);
           started = Lwt_condition.create ();
           state = new_game
         };

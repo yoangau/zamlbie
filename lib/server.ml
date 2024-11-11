@@ -34,6 +34,10 @@ let match_orchestrator match_id =
   let empty_mailboxes players =
     Hashtbl.iter players ~f:(fun coms -> coms.Match.mailbox <- None)
   in
+  let apply_in_game_effects game_match =
+    Game.Effects.(apply InGame.effects game_match.state)
+    |> Match.update_game_state game_match
+  in
   let game_match = Match.Registry.find_exn match_id in
   let%lwt () = Lwt_condition.wait game_match.started in
   broadcast (`Update game_match.state) game_match;
@@ -42,7 +46,7 @@ let match_orchestrator match_id =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
     empty_mailboxes game_match.players;
-    Game.apply_in_game_effects game_match.state |> Match.update_game_state game_match;
+    apply_in_game_effects game_match;
     broadcast (`Update game_match.state) game_match;
     match Game.verify_end_conditions game_match.state start_time with
     | None -> tick ()

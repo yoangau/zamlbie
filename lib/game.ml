@@ -49,115 +49,123 @@ let move ~game ~id ~move =
   else Some (update_entity game { entity with x = nx; y = ny })
 ;;
 
-let apply_start_effects game =
-  let zombie_sortition game =
-    let player_ids =
-      List.filter_map
-        (fun e ->
-          match e.entity_type with
-          | `Player `Human -> Some e
-          | _ -> None)
-        game.entities
-    in
-    let player_count = List.length player_ids in
-    let random_player_idx = Random.int player_count in
-    let player_zombie_to_be = List.nth player_ids random_player_idx in
-    update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
-  in
-  let distribute_players game =
-    let width, height = (game.config.width, game.config.height) in
-    let rec generate_unique_position occupied_positions =
-      let x = Random.int width in
-      let y = Random.int height in
-      let pos = (x, y) in
-      if List.mem pos occupied_positions
-      then generate_unique_position occupied_positions
-      else pos
-    in
-    let all_positions =
-      List.fold_left
-        (fun acc _ ->
-          let unique_pos = generate_unique_position acc in
-          unique_pos :: acc)
-        []
-        game.entities
-    in
-    let rec assign_positions entities positions =
-      match (entities, positions) with
-      | [], _ | _, [] -> []
-      | entity :: rest, pos :: pos_rest ->
-        let updated_entity = { entity with x = fst pos; y = snd pos } in
-        updated_entity :: assign_positions rest pos_rest
-    in
-    let players, others =
-      List.partition
-        (fun e ->
-          match e.entity_type with
-          | `Player _ -> true
-          | _ -> false)
-        game.entities
-    in
-    let updated_players = assign_positions players all_positions in
-    { game with entities = updated_players @ others }
-  in
-  let add_walls game =
-    let occupied_positions = List.map (fun e -> (e.x, e.y)) game.entities in
-    let is_already_occupied xy = List.mem xy occupied_positions in
-    let width, height = (game.config.width, game.config.height) in
-    let create_wall x y =
-      { default_entity with x; y; entity_type = `Environment `Wall }
-    in
-    let rec generate_random_walls n acc =
-      if n <= 0
-      then acc
-      else (
+module Effects = struct
+  let apply effects game = List.fold_left (fun game action -> action game) game effects
+
+  module Start = struct
+    let zombie_sortition game =
+      let player_ids =
+        List.filter_map
+          (fun e ->
+            match e.entity_type with
+            | `Player `Human -> Some e
+            | _ -> None)
+          game.entities
+      in
+      let player_count = List.length player_ids in
+      let random_player_idx = Random.int player_count in
+      let player_zombie_to_be = List.nth player_ids random_player_idx in
+      update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
+    ;;
+
+    let distribute_players game =
+      let width, height = (game.config.width, game.config.height) in
+      let rec generate_unique_position occupied_positions =
         let x = Random.int width in
         let y = Random.int height in
-        let orientation = Random.int 2 in
-        let length = Random.int 4 + 2 in
-        let new_wall =
-          (match orientation with
-           | 0 ->
-             List.init length (fun i ->
-               if x + i < width && not (is_already_occupied (x + i, y))
-               then Some (create_wall (x + i) y)
-               else None)
-           | _ ->
-             List.init length (fun i ->
-               if y + i < height && not (is_already_occupied (x, y + i))
-               then Some (create_wall x (y + i))
-               else None))
-          |> List.filter_map Fun.id
-        in
-        generate_random_walls (n - 1) (new_wall @ acc))
-    in
-    let num_random_walls = 10 in
-    let walls = generate_random_walls num_random_walls [] in
-    List.fold_left (fun game wall -> add_entity game wall |> snd) game walls
-  in
-  let actions = [ zombie_sortition; distribute_players; add_walls ] in
-  List.fold_left (fun game action -> action game) game actions
-;;
+        let pos = (x, y) in
+        if List.mem pos occupied_positions
+        then generate_unique_position occupied_positions
+        else pos
+      in
+      let all_positions =
+        List.fold_left
+          (fun acc _ ->
+            let unique_pos = generate_unique_position acc in
+            unique_pos :: acc)
+          []
+          game.entities
+      in
+      let rec assign_positions entities positions =
+        match (entities, positions) with
+        | [], _ | _, [] -> []
+        | entity :: rest, pos :: pos_rest ->
+          let updated_entity = { entity with x = fst pos; y = snd pos } in
+          updated_entity :: assign_positions rest pos_rest
+      in
+      let players, others =
+        List.partition
+          (fun e ->
+            match e.entity_type with
+            | `Player _ -> true
+            | _ -> false)
+          game.entities
+      in
+      let updated_players = assign_positions players all_positions in
+      { game with entities = updated_players @ others }
+    ;;
 
-let apply_in_game_effects game =
-  let infection game =
-    let has_zombie_on_same_cell entity =
-      List.exists
-        (fun other ->
-          other.entity_type = `Player `Zombie && other.x = entity.x && other.y = entity.y)
-        game.entities
-    in
-    let infect entity =
-      match entity.entity_type with
-      | `Player `Human when has_zombie_on_same_cell entity ->
-        { entity with entity_type = `Player `Zombie }
-      | _ -> entity
-    in
-    { game with entities = List.map infect game.entities }
-  in
-  let actions = [ infection ] in
-  List.fold_left (fun game action -> action game) game actions
-;;
+    let generate_walls game =
+      let occupied_positions = List.map (fun e -> (e.x, e.y)) game.entities in
+      let is_already_occupied xy = List.mem xy occupied_positions in
+      let width, height = (game.config.width, game.config.height) in
+      let create_wall x y =
+        { default_entity with x; y; entity_type = `Environment `Wall }
+      in
+      let rec generate_random_walls n acc =
+        if n <= 0
+        then acc
+        else (
+          let x = Random.int width in
+          let y = Random.int height in
+          let orientation = Random.int 2 in
+          let length = Random.int 4 + 2 in
+          let new_wall =
+            (match orientation with
+             | 0 ->
+               List.init length (fun i ->
+                 if x + i < width && not (is_already_occupied (x + i, y))
+                 then Some (create_wall (x + i) y)
+                 else None)
+             | _ ->
+               List.init length (fun i ->
+                 if y + i < height && not (is_already_occupied (x, y + i))
+                 then Some (create_wall x (y + i))
+                 else None))
+            |> List.filter_map Fun.id
+          in
+          generate_random_walls (n - 1) (new_wall @ acc))
+      in
+      let num_random_walls = 10 in
+      let walls = generate_random_walls num_random_walls [] in
+      List.fold_left (fun game wall -> add_entity game wall |> snd) game walls
+    ;;
+
+    let effects = [ zombie_sortition; distribute_players; generate_walls ]
+  end
+
+  module InGame = struct
+    let infection game =
+      let has_zombie_on_same_cell entity =
+        List.exists
+          (fun other ->
+            other.entity_type = `Player `Zombie
+            && other.x = entity.x
+            && other.y = entity.y)
+          game.entities
+      in
+      let infect entity =
+        match entity.entity_type with
+        | `Player `Human when has_zombie_on_same_cell entity ->
+          { entity with entity_type = `Player `Zombie }
+        | _ -> entity
+      in
+      { game with entities = List.map infect game.entities }
+    ;;
+
+    let effects = [ infection ]
+  end
+end
 
 type game_ended =
   | Win of character_type

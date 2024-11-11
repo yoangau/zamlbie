@@ -7,6 +7,8 @@ let send message socket =
   Dream.send socket serialized
 ;;
 
+let game_update_message game = `Update (Game.serialize game)
+
 let receive socket =
   Dream.receive socket
   >>= function
@@ -21,13 +23,19 @@ let close_ws = Match.players_ws_iter ~f:(fun ws -> Dream.close_websocket ws |> i
 
 let match_orchestrator match_id =
   let execute_player_moves game_match =
+    let walls =
+      Game.gather_positions
+        ~entity_to_find:(`Environment `Wall)
+        ~entities:game_match.Match.state.entities
+    in
     Hashtbl.iteri
       game_match.Match.players
       ~f:
         Stdlib.(
-          fun ~key:id ~data:{ mailbox; _ } ->
+          fun ~key:entity_id ~data:{ mailbox; _ } ->
             mailbox
-            |> Option.map (fun move -> Game.move ~game:game_match.state ~id ~move)
+            |> Option.map (fun move ->
+              Game.move ~walls ~game:game_match.state ~entity_id ~move)
             |> Option.join
             |> Option.iter (Match.update_game_state game_match))
   in
@@ -40,14 +48,14 @@ let match_orchestrator match_id =
   in
   let game_match = Match.Registry.find_exn match_id in
   let%lwt () = Lwt_condition.wait game_match.started in
-  broadcast (`Update game_match.state) game_match;
+  broadcast (game_update_message game_match.state) game_match;
   let start_time = Unix.time () in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
     empty_mailboxes game_match.players;
     apply_in_game_effects game_match;
-    broadcast (`Update game_match.state) game_match;
+    broadcast (game_update_message game_match.state) game_match;
     match Game.verify_end_conditions game_match.state start_time with
     | None -> tick ()
     | Some (Other _) -> assert false (* future other end state? *)
@@ -67,7 +75,7 @@ let handle_websocket_connection candidate_match_id player_socket =
      | None -> send (`Rejected "Game full!") player_socket
      | Some client_id ->
        let%lwt () = send (`Joined client_id) player_socket in
-       let%lwt () = send (`Update game_match.state) player_socket in
+       let%lwt () = send (game_update_message game_match.state) player_socket in
        let rec input_loop () =
          receive player_socket
          >>= function
@@ -86,9 +94,10 @@ let run () =
        [ (Dream.post "/create_game"
           @@ fun request ->
           let%lwt body = Dream.body request in
-          let config = Game.Serializer.config_of_string body in
-          let game_match = Match.Registry.new_match config match_orchestrator in
-          Dream.respond (Game.Serializer.string_of_game game_match));
+          let config = Game.WireFormat.Serializer.config_of_string body in
+          let game = Match.Registry.new_match config match_orchestrator in
+          Dream.respond (Game.WireFormat.Serializer.string_of_game (Game.serialize game))
+         );
          (Dream.get "/join/:id"
           @@ fun request ->
           let id = Dream.param request "id" |> Int.of_string in

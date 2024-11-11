@@ -1,7 +1,28 @@
-include Game_t
-module Serializer = Game_j
+module WireFormat = struct
+  include Game_t
+  module Serializer = Game_j
+end
 
 let () = Random.self_init ()
+let game_id_gen = Uuid.create_gen ()
+
+type config = WireFormat.config
+type entity = WireFormat.entity
+
+type t =
+  { game_id : int;
+    entities : (Base.Int.t, entity) Base.Hashtbl.t;
+    config : config
+  }
+
+let serialize (t : t) =
+  WireFormat.
+    { game_id = t.game_id; config = t.config; entities = Base.Hashtbl.data t.entities }
+;;
+
+let make game_id config =
+  { game_id; entities = Base.Hashtbl.create (module Uuid.HashtblKey); config }
+;;
 
 let get_move_delta = function
   | `Up -> (0, -1)
@@ -10,43 +31,55 @@ let get_move_delta = function
   | `Right -> (1, 0)
 ;;
 
-let default_entity = { id = 0; entity_type = `Player `Human; x = 0; y = 0 }
-let is_entity a b = a.id = b.id
-let find_entity { entities; _ } id = List.find_opt (fun a -> a.id = id) entities
+let default_entity = WireFormat.{ id = 0; entity_type = `Player `Human; x = 0; y = 0 }
+let is_entity a b = WireFormat.(a.id = b.id)
+let find_entity { entities; _ } id = Base.Hashtbl.find entities id
+let find_entity_exn { entities; _ } id = Base.Hashtbl.find_exn entities id
 
 let add_entity game entity =
-  let id = Uuid.next_id () in
-  (id, { game with entities = { entity with id } :: game.entities })
+  let id = Uuid.next_id game_id_gen in
+  Base.Hashtbl.set game.entities ~key:id ~data:{ entity with id };
+  (id, game)
 ;;
 
 let update_entity game new_entity =
-  { game with
-    entities =
-      List.map
-        (fun entity -> if is_entity entity new_entity then new_entity else entity)
-        game.entities
-  }
+  Base.Hashtbl.set game.entities ~key:new_entity.WireFormat.id ~data:new_entity;
+  game
 ;;
 
-let move ~game ~id ~move =
+module Set = Set.Make (struct
+    type t = int * int
+
+    let compare = Stdlib.compare
+  end)
+
+let gather_positions ~entity_to_find ~entities =
+  Base.Hashtbl.fold
+    entities
+    ~init:Set.empty
+    ~f:(fun ~key:_ ~data:WireFormat.{ entity_type; x; y; _ } positions ->
+      if entity_type = entity_to_find then Set.add (x, y) positions else positions)
+;;
+
+let move ~walls ~game ~entity_id ~move =
   let ( let* ) = Base.Option.( >>= ) in
-  let* entity = find_entity game id in
+  let* entity = find_entity game entity_id in
   let dx, dy = get_move_delta move in
   let nx, ny =
     ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.config.width - 1),
       Base.Int.clamp_exn (entity.y + dy) ~min:0 ~max:(game.config.height - 1) )
   in
-  let walls =
-    List.filter_map
-      (fun e ->
-        match e.entity_type with
-        | `Environment `Wall -> Some (e.x, e.y)
-        | _ -> None)
-      game.entities
-  in
-  if List.mem (nx, ny) walls
+  if Set.mem (nx, ny) walls
   then None
   else Some (update_entity game { entity with x = nx; y = ny })
+;;
+
+let get_players game =
+  Base.Hashtbl.data game.entities
+  |> List.filter_map (fun e ->
+    match e.WireFormat.entity_type with
+    | `Player _ -> Some e
+    | _ -> None)
 ;;
 
 module Effects = struct
@@ -54,17 +87,10 @@ module Effects = struct
 
   module Start = struct
     let zombie_sortition game =
-      let player_ids =
-        List.filter_map
-          (fun e ->
-            match e.entity_type with
-            | `Player `Human -> Some e
-            | _ -> None)
-          game.entities
-      in
-      let player_count = List.length player_ids in
+      let players = get_players game in
+      let player_count = List.length players in
       let random_player_idx = Random.int player_count in
-      let player_zombie_to_be = List.nth player_ids random_player_idx in
+      let player_zombie_to_be = List.nth players random_player_idx in
       update_entity game { player_zombie_to_be with entity_type = `Player `Zombie }
     ;;
 
@@ -79,34 +105,26 @@ module Effects = struct
         else pos
       in
       let all_positions =
-        List.fold_left
-          (fun acc _ ->
-            let unique_pos = generate_unique_position acc in
-            unique_pos :: acc)
-          []
-          game.entities
+        Base.Hashtbl.fold game.entities ~init:[] ~f:(fun ~key:_ ~data:_ acc ->
+          let unique_pos = generate_unique_position acc in
+          unique_pos :: acc)
       in
-      let rec assign_positions entities positions =
-        match (entities, positions) with
+      let rec assign_positions players positions =
+        match (players, positions) with
         | [], _ | _, [] -> []
-        | entity :: rest, pos :: pos_rest ->
-          let updated_entity = { entity with x = fst pos; y = snd pos } in
+        | entity :: rest, (x, y) :: pos_rest ->
+          let updated_entity = WireFormat.{ entity with x; y } in
           updated_entity :: assign_positions rest pos_rest
       in
-      let players, others =
-        List.partition
-          (fun e ->
-            match e.entity_type with
-            | `Player _ -> true
-            | _ -> false)
-          game.entities
-      in
+      let players = get_players game in
       let updated_players = assign_positions players all_positions in
-      { game with entities = updated_players @ others }
+      List.fold_left update_entity game updated_players
     ;;
 
     let generate_walls game =
-      let occupied_positions = List.map (fun e -> (e.x, e.y)) game.entities in
+      let occupied_positions =
+        Base.Hashtbl.data game.entities |> List.map (fun e -> (e.WireFormat.x, e.y))
+      in
       let is_already_occupied xy = List.mem xy occupied_positions in
       let width, height = (game.config.width, game.config.height) in
       let create_wall x y =
@@ -146,21 +164,20 @@ module Effects = struct
 
   module InGame = struct
     let infection game =
-      let has_zombie_on_same_cell entity =
-        List.exists
-          (fun other ->
-            other.entity_type = `Player `Zombie
-            && other.x = entity.x
-            && other.y = entity.y)
-          game.entities
+      let zombie_positions =
+        gather_positions ~entity_to_find:(`Player `Zombie) ~entities:game.entities
+      in
+      let has_zombie_on_same_cell WireFormat.{ x; y; _ } =
+        Set.mem (x, y) zombie_positions
       in
       let infect entity =
-        match entity.entity_type with
+        match entity.WireFormat.entity_type with
         | `Player `Human when has_zombie_on_same_cell entity ->
           { entity with entity_type = `Player `Zombie }
         | _ -> entity
       in
-      { game with entities = List.map infect game.entities }
+      Base.Hashtbl.map_inplace game.entities ~f:infect;
+      game
     ;;
 
     let effects = [ infection ]
@@ -168,16 +185,16 @@ module Effects = struct
 end
 
 type game_ended =
-  | Win of character_type
+  | Win of WireFormat.character_type
   | Other of string
 
 let verify_end_conditions game start_time =
   let all_zombie entities =
-    entities
-    |> List.for_all (fun e ->
-      match e.entity_type with
-      | `Player `Human -> false
-      | _ -> true)
+    not
+    @@ Base.Hashtbl.exists entities ~f:(fun e ->
+      match e.WireFormat.entity_type with
+      | `Player `Human -> true
+      | _ -> false)
   in
   let now = Unix.time () in
   if int_of_float (now -. start_time) >= game.config.time_limit
@@ -186,5 +203,3 @@ let verify_end_conditions game start_time =
   then Some (Win `Zombie)
   else None
 ;;
-
-let make game_id config = { game_id; entities = []; config }

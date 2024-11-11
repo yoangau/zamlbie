@@ -57,16 +57,17 @@ let dist_sq (ax, ay) (bx, by) =
 let is_visible distance_sq view_radius_sq = distance_sq <= view_radius_sq
 
 let is_outside (x, y) config =
-  x < 0 || x >= config.Game.width || y < 0 || y >= config.height
+  x < 0 || x >= config.Game.WireFormat.width || y < 0 || y >= config.height
 ;;
 
-let render ~me terminal Game.{ config; entities; _ } =
+let render ~me terminal Game.WireFormat.{ config; entities; _ } =
   let window_height, window_width = (20, 20) in
   let entities_set =
-    Map.of_list (List.map (fun entity -> Game.((entity.x, entity.y), entity)) entities)
+    Map.of_list
+      (List.map (fun entity -> Game.WireFormat.((entity.x, entity.y), entity)) entities)
   in
-  let Game.{ x = mx; y = my; entity_type; _ } =
-    List.find (fun e -> e.Game.id = me) entities
+  let Game.WireFormat.{ x = mx; y = my; entity_type; _ } =
+    List.find (fun e -> e.Game.WireFormat.id = me) entities
   in
   let view_radius_sq =
     let vr =
@@ -127,9 +128,10 @@ let receive client_id terminal message =
 
 let create_game config =
   let open Lwt.Infix in
+  let open Game.WireFormat in
   let url = Config.server_url ^ "/create_game" in
-  Rest_client.post url (Game.Serializer.string_of_config config)
-  >>= fun s -> Option.map Game.Serializer.game_of_string s |> Lwt.return
+  Rest_client.post url (Serializer.string_of_config config)
+  >>= fun s -> Option.map Serializer.game_of_string s |> Lwt.return
 ;;
 
 let join_game terminal game_id =

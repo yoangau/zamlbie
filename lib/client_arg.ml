@@ -1,5 +1,5 @@
 type command =
-  | Create of Game.config
+  | Create of Game.WireFormat.config
   | Join of int
 
 let parse_args () =
@@ -49,7 +49,7 @@ let parse_args () =
   | Some "create" ->
     Ok
       (Create
-         Game.
+         Game.WireFormat.
            { width = !width;
              height = !height;
              human_view_radius = !human_view_radius;

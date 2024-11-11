@@ -2,13 +2,13 @@ open Base
 
 type player_t =
   { websocket : Dream.websocket;
-    mutable mailbox : Game.move option
+    mutable mailbox : Game.WireFormat.move option
   }
 
 type t =
   { players : (Uuid.HashtblKey.t, player_t) Hashtbl.t;
     started : unit Lwt_condition.t;
-    mutable state : Game.game
+    mutable state : Game.t
   }
 
 let update_game_state t new_state = t.state <- new_state
@@ -50,9 +50,10 @@ module Registry = struct
   let find_exn id = Hashtbl.find_exn matches id
   let find id = Hashtbl.find matches id
   let remove id = Hashtbl.remove matches id
+  let next_id_gen = Uuid.create_gen ()
 
   let new_match config thread =
-    let match_id = Uuid.next_id () in
+    let match_id = Uuid.next_id next_id_gen in
     let new_game = Game.make match_id config in
     Hashtbl.add_exn
       matches

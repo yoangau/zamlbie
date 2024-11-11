@@ -22,7 +22,7 @@ let mailbox_move t player_id move =
 let players_ws_iter t ~f = Hashtbl.iter t.players ~f:(fun { websocket; _ } -> f websocket)
 
 let start t =
-  let start_game_state = Game.apply_start_effects t.state in
+  let start_game_state = Game.Effects.(apply Start.effects t.state) in
   update_game_state t start_game_state;
   Lwt_condition.signal t.started ()
 ;;

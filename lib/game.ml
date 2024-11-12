@@ -33,7 +33,7 @@ let gather_positions ~p ~entities =
 
 let partition_map ({ x = px; y = py; _ } : entity) { entities; _ } =
   let positions_to_send =
-    let w, h = (20, 20) in
+    let w, h = (21, 21) in
     List.init w (fun x -> List.init h (fun y -> (px + x - (w / 2), py + y - (h / 2))))
     |> List.flatten
     |> Set.of_list

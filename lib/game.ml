@@ -17,6 +17,11 @@ type t =
     config : config
   }
 
+let default_entity = WireFormat.{ id = 0; entity_type = `Player `Human; x = 0; y = 0 }
+let is_entity a b = WireFormat.(a.id = b.id)
+let find_entity { entities; _ } id = Base.Hashtbl.find entities id
+let find_entity_exn { entities; _ } id = Base.Hashtbl.find_exn entities id
+
 module Set = Set.Make (struct
     type t = int * int
 
@@ -31,14 +36,15 @@ let gather_positions ~p ~entities =
       if p entity_type then Set.add (x, y) positions else positions)
 ;;
 
-let partition_map ({ x = px; y = py; _ } : entity) { entities; _ } =
+let partition_map id game =
+  let WireFormat.{ x = px; y = py; _ } = find_entity_exn game id in
   let positions_to_send =
     let w, h = (21, 21) in
     List.init w (fun x -> List.init h (fun y -> (px + x - (w / 2), py + y - (h / 2))))
     |> List.flatten
     |> Set.of_list
   in
-  entities
+  game.entities
   |> Base.Hashtbl.data
   |> List.filter (fun ({ x; y; _ } : entity) -> Set.mem (x, y) positions_to_send)
 ;;
@@ -53,11 +59,6 @@ let get_move_delta = function
   | `Left -> (-1, 0)
   | `Right -> (1, 0)
 ;;
-
-let default_entity = WireFormat.{ id = 0; entity_type = `Player `Human; x = 0; y = 0 }
-let is_entity a b = WireFormat.(a.id = b.id)
-let find_entity { entities; _ } id = Base.Hashtbl.find entities id
-let find_entity_exn { entities; _ } id = Base.Hashtbl.find_exn entities id
 
 let add_entity game entity =
   let id = Uuid.next_id game_id_gen in

@@ -11,9 +11,7 @@ let game_update_message ?player_id game =
   let entities =
     match player_id with
     | None -> Hashtbl.data game.Game.entities
-    | Some id ->
-      let player = Game.find_entity_exn game id in
-      Game.partition_map player game
+    | Some id -> Game.partition_map id game
   in
   `Update
     (Game.WireFormat.wire_format ~game_id:game.game_id ~config:game.config ~entities)

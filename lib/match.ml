@@ -19,7 +19,9 @@ let mailbox_move t player_id move =
   |> Stdlib.Option.iter (fun player -> player.mailbox <- Some move)
 ;;
 
-let players_ws_iter t ~f = Hashtbl.iter t.players ~f:(fun { websocket; _ } -> f websocket)
+let players_ws_iter t ~f =
+  Hashtbl.iteri t.players ~f:(fun ~key ~data:{ websocket; _ } -> f websocket key)
+;;
 
 let start t =
   let start_game_state = Game.Effects.(apply Start.effects t.state) in

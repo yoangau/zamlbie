@@ -61,7 +61,7 @@ let is_outside (x, y) config =
 ;;
 
 let render ~me terminal Game.WireFormat.{ config; entities; _ } =
-  let window_height, window_width = (20, 20) in
+  let window_height, window_width = (21, 21) in
   let entities_set =
     Map.of_list
       (List.map (fun entity -> Game.WireFormat.((entity.x, entity.y), entity)) entities)

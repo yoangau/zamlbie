@@ -1,6 +1,8 @@
 module WireFormat = struct
   include Game_t
   module Serializer = Game_j
+
+  let serialize ~game_id ~config ~entities = { game_id; config; entities }
 end
 
 let () = Random.self_init ()
@@ -15,9 +17,30 @@ type t =
     config : config
   }
 
-let serialize (t : t) =
-  WireFormat.
-    { game_id = t.game_id; config = t.config; entities = Base.Hashtbl.data t.entities }
+module Set = Set.Make (struct
+    type t = int * int
+
+    let compare = Stdlib.compare
+  end)
+
+let gather_positions ~p ~entities =
+  Base.Hashtbl.fold
+    entities
+    ~init:Set.empty
+    ~f:(fun ~key:_ ~data:WireFormat.{ entity_type; x; y; _ } positions ->
+      if p entity_type then Set.add (x, y) positions else positions)
+;;
+
+let partition_map ({ x = px; y = py; _ } : entity) { entities; _ } =
+  let positions_to_send =
+    let w, h = (20, 20) in
+    List.init w (fun x -> List.init h (fun y -> (px + x - (w / 2), py + y - (h / 2))))
+    |> List.flatten
+    |> Set.of_list
+  in
+  entities
+  |> Base.Hashtbl.data
+  |> List.filter (fun ({ x; y; _ } : entity) -> Set.mem (x, y) positions_to_send)
 ;;
 
 let make game_id config =
@@ -45,20 +68,6 @@ let add_entity game entity =
 let update_entity game new_entity =
   Base.Hashtbl.set game.entities ~key:new_entity.WireFormat.id ~data:new_entity;
   game
-;;
-
-module Set = Set.Make (struct
-    type t = int * int
-
-    let compare = Stdlib.compare
-  end)
-
-let gather_positions ~entity_to_find ~entities =
-  Base.Hashtbl.fold
-    entities
-    ~init:Set.empty
-    ~f:(fun ~key:_ ~data:WireFormat.{ entity_type; x; y; _ } positions ->
-      if entity_type = entity_to_find then Set.add (x, y) positions else positions)
 ;;
 
 let move ~walls ~game ~entity_id ~move =
@@ -165,7 +174,7 @@ module Effects = struct
   module InGame = struct
     let infection game =
       let zombie_positions =
-        gather_positions ~entity_to_find:(`Player `Zombie) ~entities:game.entities
+        gather_positions ~p:(fun e -> e = `Player `Zombie) ~entities:game.entities
       in
       let has_zombie_on_same_cell WireFormat.{ x; y; _ } =
         Set.mem (x, y) zombie_positions

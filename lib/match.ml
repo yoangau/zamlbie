@@ -65,7 +65,7 @@ module Registry = struct
           started = Lwt_condition.create ();
           state = new_game
         };
-    Lwt_preemptive.detach thread match_id |> ignore;
+    Lwt.dont_wait (fun () -> thread match_id) (fun _ -> ());
     new_game
   ;;
 end

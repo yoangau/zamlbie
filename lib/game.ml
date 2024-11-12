@@ -2,7 +2,7 @@ module WireFormat = struct
   include Game_t
   module Serializer = Game_j
 
-  let serialize ~game_id ~config ~entities = { game_id; config; entities }
+  let wire_format ~game_id ~config ~entities = { game_id; config; entities }
 end
 
 let () = Random.self_init ()

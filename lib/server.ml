@@ -1,20 +1,22 @@
 open Base
 open Lwt.Infix
 
-let send message socket =
+let send socket message =
   let serialized = Message.Serializer.string_of_server_message message in
   Dream.log "Sending message: %s" serialized;
   Dream.send socket serialized
 ;;
 
-let game_update_message game player_id =
-  let player = Game.find_entity_exn game player_id in
-  let partitioned_entities = Game.partition_map player game in
+let game_update_message ?player_id game =
+  let entities =
+    match player_id with
+    | None -> Hashtbl.data game.Game.entities
+    | Some id ->
+      let player = Game.find_entity_exn game id in
+      Game.partition_map player game
+  in
   `Update
-    (Game.WireFormat.serialize
-       ~game_id:game.game_id
-       ~config:game.config
-       ~entities:partitioned_entities)
+    (Game.WireFormat.wire_format ~game_id:game.game_id ~config:game.config ~entities)
 ;;
 
 let receive socket =
@@ -27,11 +29,13 @@ let receive socket =
 ;;
 
 let close_ws = Match.players_ws_iter ~f:(fun ws _ -> Dream.close_websocket ws |> ignore)
-let broadcast message = Match.players_ws_iter ~f:(fun ws _ -> send message ws |> ignore)
+let broadcast message = Match.players_ws_iter ~f:(fun ws _ -> send ws message |> ignore)
 
-let send_game_updates game =
-  Match.players_ws_iter ~f:(fun ws player_id ->
-    send (game_update_message game player_id) ws |> ignore)
+let send_game_updates game_match =
+  Match.players_ws_iter
+    ~f:(fun ws player_id ->
+      send ws (game_update_message ~player_id game_match.state) |> ignore)
+    game_match
 ;;
 
 let match_orchestrator match_id =
@@ -63,14 +67,14 @@ let match_orchestrator match_id =
   in
   let game_match = Match.Registry.find_exn match_id in
   let%lwt () = Lwt_condition.wait game_match.started in
-  send_game_updates game_match.state game_match;
+  send_game_updates game_match;
   let start_time = Unix.time () in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
     empty_mailboxes game_match.players;
     apply_in_game_effects game_match;
-    send_game_updates game_match.state game_match;
+    send_game_updates game_match;
     match Game.verify_end_conditions game_match.state start_time with
     | None -> tick ()
     | Some (Other _) -> assert false (* future other end state? *)
@@ -83,23 +87,24 @@ let match_orchestrator match_id =
 ;;
 
 let handle_websocket_connection candidate_match_id player_socket =
+  let send = send player_socket in
   match Match.Registry.find candidate_match_id with
-  | None -> send (`Rejected "Game not found!") player_socket
+  | None -> send (`Rejected "Game not found!")
   | Some game_match ->
     (match Match.try_join_match game_match player_socket with
-     | None -> send (`Rejected "Game full!") player_socket
+     | None -> send (`Rejected "Game full!")
      | Some player_id ->
-       let%lwt () = send (`Joined player_id) player_socket in
-       let%lwt () = send (game_update_message game_match.state player_id) player_socket in
-       let rec input_loop () =
+       let%lwt () = send (`Joined player_id) in
+       let%lwt () = send (game_update_message ~player_id game_match.state) in
+       let rec receive_player_input () =
          receive player_socket
          >>= function
          | Ok (`Move move) ->
            Match.mailbox_move game_match player_id move;
-           input_loop ()
+           receive_player_input ()
          | Error _ | _ -> Lwt.return ()
        in
-       input_loop ())
+       receive_player_input ())
 ;;
 
 let run () =
@@ -110,15 +115,10 @@ let run () =
           @@ fun request ->
           let%lwt body = Dream.body request in
           let config = Game.WireFormat.Serializer.config_of_string body in
-          let Game.{ game_id; config; entities } =
-            Match.Registry.new_match config match_orchestrator
+          let (`Update game) =
+            Match.Registry.new_match config match_orchestrator |> game_update_message
           in
-          Dream.respond
-            (Game.WireFormat.Serializer.string_of_game
-               (Game.WireFormat.serialize
-                  ~game_id
-                  ~config
-                  ~entities:(Hashtbl.data entities))));
+          Dream.respond @@ Game.WireFormat.Serializer.string_of_game game);
          (Dream.get "/join/:id"
           @@ fun request ->
           let id = Dream.param request "id" |> Int.of_string in

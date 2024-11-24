@@ -17,7 +17,10 @@ type t =
     config : config
   }
 
-let default_entity = WireFormat.{ id = 0; entity_type = `Player `Human; x = 0; y = 0 }
+let default_entity =
+  WireFormat.{ id = 0; entity_type = `Player `Human; x = 0; y = 0; z = 0 }
+;;
+
 let is_entity a b = WireFormat.(a.id = b.id)
 let find_entity { entities; _ } id = Base.Hashtbl.find entities id
 let find_entity_exn { entities; _ } id = Base.Hashtbl.find_exn entities id

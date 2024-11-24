@@ -1,6 +1,6 @@
 type character_type = [ Human | Zombie ]
 
-type environment_type = [ Wall | Glass | StairUp | StairDown ]
+type environment_type = [ Wall | Glass | StairsUp | StairsDown ]
 
 type entity_type = [ Player of character_type | Environment of environment_type ]
 

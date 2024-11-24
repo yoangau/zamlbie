@@ -47,8 +47,8 @@ let render_entity entity_type distance_sq view_radius_sq =
   | `Player `Zombie -> solid A.(rgb ~r:0 ~g:(int_of_float scale) ~b:0)
   | `Environment `Wall -> wall
   | `Environment `Glass -> solid A.blue
-  | `Environment `StairUp -> stairs_up
-  | `Environment `StairDown -> stairs_down
+  | `Environment `StairsUp -> stairs_up
+  | `Environment `StairsDown -> stairs_down
 ;;
 
 let dist_sq (ax, ay) (bx, by) =

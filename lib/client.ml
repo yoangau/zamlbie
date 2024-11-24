@@ -30,7 +30,10 @@ let fog_env distance_sq view_radius_sq =
   else visible_background
 ;;
 
-let wall : image = I.uchar A.(bg white) (Uchar.of_char ' ') 1 1
+let solid color : image = I.uchar A.(bg color) (Uchar.of_char ' ') 1 1
+let wall : image = solid A.white
+let stairs_up : image = I.uchar A.(bg cyan) (Uchar.of_int 0x259F) 1 1
+let stairs_down : image = I.uchar A.(bg magenta) (Uchar.of_int 0x2599) 1 1
 
 let render_entity entity_type distance_sq view_radius_sq =
   let visibility_ratio =
@@ -39,14 +42,13 @@ let render_entity entity_type distance_sq view_radius_sq =
   let scale =
     5.0 *. Base.Float.clamp_exn (visibility_ratio *. visibility_ratio) ~min:0.0 ~max:1.0
   in
-  let color =
-    match entity_type with
-    | `Player `Human -> A.(rgb ~r:(int_of_float scale) ~g:0 ~b:0)
-    | `Player `Zombie -> A.(rgb ~r:0 ~g:(int_of_float scale) ~b:0)
-    | `Environment `Wall -> A.(white)
-    | `Environment `Glass -> A.(blue)
-  in
-  I.uchar A.(bg color) (Uchar.of_char ' ') 1 1
+  match entity_type with
+  | `Player `Human -> solid A.(rgb ~r:(int_of_float scale) ~g:0 ~b:0)
+  | `Player `Zombie -> solid A.(rgb ~r:0 ~g:(int_of_float scale) ~b:0)
+  | `Environment `Wall -> wall
+  | `Environment `Glass -> solid A.blue
+  | `Environment `StairUp -> stairs_up
+  | `Environment `StairDown -> stairs_down
 ;;
 
 let dist_sq (ax, ay) (bx, by) =

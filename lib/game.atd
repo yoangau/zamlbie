@@ -1,6 +1,6 @@
 type character_type = [ Human | Zombie ]
 
-type environment_type = [ Wall | Glass ]
+type environment_type = [ Wall | Glass | StairUp | StairDown ]
 
 type entity_type = [ Player of character_type | Environment of environment_type ]
 
@@ -8,7 +8,8 @@ type entity =
   { entity_type : entity_type;
     id : int;
     x : int;
-    y : int
+    y : int;
+    z : int;
   }
 
 type config =

@@ -1,6 +1,7 @@
 type command =
   | Create of Game.WireFormat.config
   | Join of int
+  | Test of Game.WireFormat.config
 
 let parse_args () =
   let game_id = ref None in
@@ -20,6 +21,7 @@ let parse_args () =
             game_id := Some id),
         "Join a game with specified ID" );
       ("--create", Arg.Unit (fun () -> mode := Some "create"), "Create a new game");
+      ("--test", Arg.Unit (fun () -> mode := Some "test"), "Create a offline client game");
       ("--width", Arg.Set_int width, "Width of the game (default 20)");
       ("--height", Arg.Set_int height, "Height of the game (default 20)");
       ( "--human-view-radius",
@@ -49,6 +51,18 @@ let parse_args () =
   | Some "create" ->
     Ok
       (Create
+         Game.WireFormat.
+           { width = !width;
+             height = !height;
+             human_view_radius = !human_view_radius;
+             zombie_view_radius = !zombie_view_radius;
+             max_player_count = !max_player_count;
+             time_limit = !time_limit;
+             tick_delta = !tick_delta
+           })
+  | Some "test" ->
+    Ok
+      (Test
          Game.WireFormat.
            { width = !width;
              height = !height;

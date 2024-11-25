@@ -29,6 +29,7 @@
 (library
  (name zamlbie)
  (modules
+  effects
   server
   client
   ws_client

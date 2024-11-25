@@ -32,8 +32,8 @@ let fog_env distance_sq view_radius_sq =
 
 let solid color : image = I.uchar A.(bg color) (Uchar.of_char ' ') 1 1
 let wall : image = solid A.white
-let stairs_up : image = I.uchar A.(bg cyan) (Uchar.of_int 0x259F) 1 1
-let stairs_down : image = I.uchar A.(bg magenta) (Uchar.of_int 0x2599) 1 1
+let stairs_up : image = I.uchar A.(fg cyan ++ bg black) (Uchar.of_int 0x259F) 1 1
+let stairs_down : image = I.uchar A.(fg magenta ++ bg black) (Uchar.of_int 0x2599) 1 1
 
 let render_entity entity_type distance_sq view_radius_sq =
   let visibility_ratio =

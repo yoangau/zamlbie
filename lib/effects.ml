@@ -36,7 +36,8 @@ module Start = struct
       Game.gather_positions ~p:(fun e -> e = `Environment `Wall) ~entities:game.entities
     in
     let valid_stairs (x, y, z) =
-      (not @@ Game.Set.mem (x, y, z) walls) && (not @@ Game.Set.mem (x, y + 1, z + 1) walls)
+      (not @@ Game.Set.mem (x, y, z) walls)
+      && (not @@ Game.Set.mem (x, y + 1, z + 1) walls)
     in
     let width, height, max_z = (game.config.width, game.config.height, 2) in
     let random_pos _ = (Random.int width, Random.int height, Random.int max_z) in

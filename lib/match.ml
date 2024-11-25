@@ -24,7 +24,7 @@ let players_ws_iter t ~f =
 ;;
 
 let start t =
-  let start_game_state = Game.Effects.(apply Start.effects t.state) in
+  let start_game_state = Effects.(apply Start.effects t.state) in
   update_game_state t start_game_state;
   Lwt_condition.signal t.started ()
 ;;

@@ -25,6 +25,7 @@ let parse_args () =
         "Join a game with specified ID" );
       ("--test", Arg.Unit (fun () -> mode := Some "test"), "Create a offline client game");
       ("--create", Arg.Unit (fun () -> mode := Some "create"), "Create a new game");
+      ("--test", Arg.Unit (fun () -> mode := Some "test"), "Create a offline client game");
       ("--width", Arg.Set_int width, "Width of the game (default 20)");
       ("--height", Arg.Set_int height, "Height of the game (default 20)");
       ( "--human-view-radius",

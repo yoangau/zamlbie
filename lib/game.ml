@@ -39,6 +39,14 @@ let gather_positions ~p ~entities =
       if p entity_type then Set.add (x, y, z) positions else positions)
 ;;
 
+let get_players game =
+  Base.Hashtbl.data game.entities
+  |> List.filter_map (fun e ->
+    match e.WireFormat.entity_type with
+    | `Player _ -> Some e
+    | _ -> None)
+;;
+
 let partition_map id game =
   let WireFormat.{ x = px; y = py; z = pz; _ } = find_entity_exn game id in
   let positions_to_send =
@@ -86,14 +94,6 @@ let move ~walls ~game ~entity_id ~move =
   if Set.mem (nx, ny, entity.z) walls
   then None
   else Some (update_entity game { entity with x = nx; y = ny })
-;;
-
-let get_players game =
-  Base.Hashtbl.data game.entities
-  |> List.filter_map (fun e ->
-    match e.WireFormat.entity_type with
-    | `Player _ -> Some e
-    | _ -> None)
 ;;
 
 type game_ended =

@@ -1,0 +1,20 @@
+type theme_name =
+  [ 
+  | Default
+  | Fire
+  | Ocean
+  | Forest
+  | Volcano
+  | Candy
+  | Desert
+  | Ice
+  | Twilight
+  | Galaxy
+  | Sunset
+  | Cyber
+  | Mystic
+  | Jungle
+  | Cave
+  | Aurora
+  | Void
+  ]

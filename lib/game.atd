@@ -1,3 +1,5 @@
+type theme_name <ocaml from="Theme"> = abstract
+
 type character_type = [ Human | Zombie ]
 
 type environment_type = [ Wall | Glass | StairsUp | StairsDown ]
@@ -19,7 +21,8 @@ type config =
     height : int;
     max_player_count : int;
     time_limit : int;
-    tick_delta : float
+    tick_delta : float;
+    theme_name : theme_name
   }
 
 type game =

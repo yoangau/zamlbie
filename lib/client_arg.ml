@@ -56,7 +56,8 @@ let parse_args () =
              zombie_view_radius = !zombie_view_radius;
              max_player_count = !max_player_count;
              time_limit = !time_limit;
-             tick_delta = !tick_delta
+             tick_delta = !tick_delta;
+             theme_name = `Default
            })
   | _ ->
     Printf.eprintf "Error: specify either --join <int> or --create with options.\n";

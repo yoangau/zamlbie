@@ -1,54 +1,37 @@
 open Notty
 open Notty_lwt
 
-let hidden_background i : image =
-  I.uchar A.(fg lightblack ++ bg black) (Uchar.of_int (0x2591 + i)) 1 1
-;;
-
-let fog_gradient visibility_ratio : image =
-  let scale = 23.0 *. Base.Float.clamp_exn visibility_ratio ~min:0.0 ~max:1.0 in
-  I.uchar A.(bg (gray @@ int_of_float scale)) (Uchar.of_int 0x2591) 1 1
-;;
-
-let visible_background : image = I.uchar A.(bg black) (Uchar.of_char ' ') 1 1
-
 module Map = Map.Make (struct
     type t = int * int
 
     let compare = Stdlib.compare
   end)
 
-let fog_env distance_sq view_radius_sq =
+let fog_env (theme_name : Theme_t.theme_name) distance_sq view_radius_sq =
   let view_radius_sq = float_of_int view_radius_sq in
+  (* TODO: This will need to be updated... the theme update broke the fog *)
   if distance_sq > view_radius_sq
   then (
     let distance = sqrt distance_sq in
     let view_radius = view_radius_sq |> sqrt in
-    fog_gradient @@ ((distance -. view_radius) /. 20.0))
+    World.get_render
+      theme_name
+      (`Environment `Fog)
+      ~alpha:(1.0 -. ((distance -. view_radius) /. 20.0)))
   else if distance_sq = view_radius_sq
-  then hidden_background 0
-  else visible_background
+  then World.get_render theme_name (`Environment (`Hidden 0))
+  else World.get_render theme_name (`Environment `Visible)
 ;;
 
-let solid color : image = I.uchar A.(bg color) (Uchar.of_char ' ') 1 1
-let wall : image = solid A.white
-let stairs_up : image = I.uchar A.(fg cyan ++ bg black) (Uchar.of_int 0x259F) 1 1
-let stairs_down : image = I.uchar A.(fg magenta ++ bg black) (Uchar.of_int 0x2599) 1 1
-
-let render_entity entity_type distance_sq view_radius_sq =
+let render_entity (theme_name : Theme_t.theme_name) entity_type distance_sq view_radius_sq
+  =
   let visibility_ratio =
     1.0 -. (float_of_int distance_sq /. float_of_int view_radius_sq)
   in
   let scale =
     5.0 *. Base.Float.clamp_exn (visibility_ratio *. visibility_ratio) ~min:0.0 ~max:1.0
   in
-  match entity_type with
-  | `Player `Human -> solid A.(rgb ~r:(int_of_float scale) ~g:0 ~b:0)
-  | `Player `Zombie -> solid A.(rgb ~r:0 ~g:(int_of_float scale) ~b:0)
-  | `Environment `Wall -> wall
-  | `Environment `Glass -> solid A.blue
-  | `Environment `StairsUp -> stairs_up
-  | `Environment `StairsDown -> stairs_down
+  World.get_render theme_name entity_type ~alpha:scale
 ;;
 
 let dist_sq (ax, ay) (bx, by) =
@@ -90,11 +73,12 @@ let render ~me terminal Game.WireFormat.{ config; entities; _ } =
     let distance_from_player = dist_sq global_position (mx, my) in
     match Map.find_opt (gx, gy) entities_set with
     | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
-      render_entity entity_type distance_from_player view_radius_sq
+      render_entity config.theme_name entity_type distance_from_player view_radius_sq
     | _
       when is_outside global_position config
-           && is_visible distance_from_player view_radius_sq -> wall
-    | _ -> fog_env (float_of_int distance_from_player) view_radius_sq
+           && is_visible distance_from_player view_radius_sq ->
+      World.get_render config.theme_name (`Environment `Wall)
+    | _ -> fog_env config.theme_name (float_of_int distance_from_player) view_radius_sq
   in
   Term.image terminal image
 ;;

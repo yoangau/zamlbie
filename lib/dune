@@ -26,6 +26,20 @@
  (action
   (run atdgen -j %{deps})))
 
+(rule
+ (targets theme_t.ml theme_t.mli)
+ (deps theme.atd)
+ (mode fallback)
+ (action
+  (run atdgen -t %{deps})))
+
+(rule
+ (targets theme_j.ml theme_j.mli)
+ (deps theme.atd)
+ (mode fallback)
+ (action
+  (run atdgen -j %{deps})))
+
 (library
  (name zamlbie)
  (modules
@@ -43,6 +57,10 @@
   message
   message_j
   message_t
+  world
+  theme
+  theme_j
+  theme_t
   uuid)
  (libraries
   websocket-lwt-unix

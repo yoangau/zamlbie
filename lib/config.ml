@@ -9,6 +9,7 @@ let default_game_config : Game.WireFormat.config =
     height = 20;
     max_player_count = 2;
     time_limit = 120;
-    tick_delta = 0.5
+    tick_delta = 0.5;
+    theme_name = `Default
   }
 ;;

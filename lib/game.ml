@@ -47,9 +47,10 @@ let partition_map id game =
     |> List.flatten
     |> Set.of_list
   in
-  game.entities
-  |> Base.Hashtbl.data
-  |> List.filter (fun ({ x; y; z; _ } : entity) -> Set.mem (x, y, z) positions_to_send)
+  ( game.entities
+    |> Base.Hashtbl.data
+    |> List.filter (fun ({ x; y; z; _ } : entity) -> Set.mem (x, y, z) positions_to_send),
+    Theme.get_theme_by_index pz )
 ;;
 
 let make game_id config =

@@ -8,13 +8,16 @@ let send socket message =
 ;;
 
 let game_update_message ?player_id game =
-  let entities =
+  let entities, theme_name =
     match player_id with
-    | None -> Hashtbl.data game.Game.entities
+    | None -> (Hashtbl.data game.Game.entities, game.config.theme_name)
     | Some id -> Game.partition_map id game
   in
   `Update
-    (Game.WireFormat.wire_format ~game_id:game.game_id ~config:game.config ~entities)
+    (Game.WireFormat.wire_format
+       ~game_id:game.game_id
+       ~config:{ game.config with theme_name }
+       ~entities)
 ;;
 
 let receive socket =

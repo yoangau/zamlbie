@@ -7,23 +7,21 @@ module Map = Map.Make (struct
     let compare = Stdlib.compare
   end)
 
-let fog_env (theme_name : Theme_t.theme_name) distance_sq view_radius_sq =
+let tile_of_fog_env distance_sq view_radius_sq : World.tile * float =
   let view_radius_sq = float_of_int view_radius_sq in
   (* TODO: This will need to be updated... the theme update broke the fog *)
   if distance_sq > view_radius_sq
   then (
     let distance = sqrt distance_sq in
     let view_radius = view_radius_sq |> sqrt in
-    World.render_tile
-      theme_name
-      (`Environment `Fog)
-      ~alpha:(1.0 -. ((distance -. view_radius) /. 20.0)))
+    (`Fog, 1.0 -. ((distance -. view_radius) /. 20.0)))
   else if distance_sq = view_radius_sq
-  then World.render_tile theme_name (`Environment (`Hidden 0))
-  else World.render_tile theme_name (`Environment `Visible)
+  then (`Hidden 0, 1.0)
+  else (`Visible, 1.0)
 ;;
 
-let render_entity (theme_name : Theme_t.theme_name) entity_type distance_sq view_radius_sq
+let tile_of_entity (entity_type : Game.WireFormat.entity_type) distance_sq view_radius_sq
+  : World.tile * float
   =
   let visibility_ratio =
     1.0 -. (float_of_int distance_sq /. float_of_int view_radius_sq)
@@ -31,7 +29,16 @@ let render_entity (theme_name : Theme_t.theme_name) entity_type distance_sq view
   let scale =
     5.0 *. Base.Float.clamp_exn (visibility_ratio *. visibility_ratio) ~min:0.0 ~max:1.0
   in
-  World.render_tile theme_name entity_type ~alpha:scale
+  let tile =
+    match entity_type with
+    | `Player `Human -> `Human
+    | `Player `Zombie -> `Zombie
+    | `Environment `Wall -> `Wall
+    | `Environment `Glass -> `Glass
+    | `Environment `StairsUp -> `StairsUp
+    | `Environment `StairsDown -> `StairsDown
+  in
+  (tile, scale)
 ;;
 
 let dist_sq (ax, ay) (bx, by) =
@@ -71,14 +78,16 @@ let render ~me terminal Game.WireFormat.{ config; entities; _ } =
     let gy = my + wy - (window_height / 2) in
     let global_position = (gx, gy) in
     let distance_from_player = dist_sq global_position (mx, my) in
-    match Map.find_opt (gx, gy) entities_set with
-    | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
-      render_entity config.theme_name entity_type distance_from_player view_radius_sq
-    | _
-      when is_outside global_position config
-           && is_visible distance_from_player view_radius_sq ->
-      World.render_tile config.theme_name (`Environment `Wall)
-    | _ -> fog_env config.theme_name (float_of_int distance_from_player) view_radius_sq
+    let tile, alpha =
+      match Map.find_opt (gx, gy) entities_set with
+      | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
+        tile_of_entity entity_type distance_from_player view_radius_sq
+      | _
+        when is_outside global_position config
+             && is_visible distance_from_player view_radius_sq -> (`Wall, 1.0)
+      | _ -> tile_of_fog_env (float_of_int distance_from_player) view_radius_sq
+    in
+    World.render_tile config.theme_name tile ~alpha
   in
   Term.image terminal image
 ;;

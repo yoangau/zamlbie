@@ -34,24 +34,32 @@ let notty_color_of_rgb ?alpha (rgb : Theme.rgb) =
       ~b:(scale_channel rgb.b a)
 ;;
 
-let render_tile ?(alpha = 1.0) theme_name tile =
+type tile =
+  [ Game.WireFormat.character_type
+  | Game.WireFormat.environment_type
+  | `Hidden of int
+  | `Visible
+  | `Fog
+  ]
+
+let render_tile ?(alpha = 1.0) theme_name (tile : tile) =
   let theme = Theme.get_theme_by_name theme_name in
   match tile with
-  | `Player `Human -> solid (notty_color_of_rgb theme.human)
-  | `Player `Zombie -> solid (notty_color_of_rgb theme.zombie ~alpha)
-  | `Environment `Wall -> solid (notty_color_of_rgb theme.wall)
-  | `Environment `Glass -> solid (notty_color_of_rgb theme.glass)
-  | `Environment `StairsUp ->
+  | `Human -> solid (notty_color_of_rgb theme.human)
+  | `Zombie -> solid (notty_color_of_rgb theme.zombie ~alpha)
+  | `Wall -> solid (notty_color_of_rgb theme.wall)
+  | `Glass -> solid (notty_color_of_rgb theme.glass)
+  | `StairsUp ->
     stairs_up (notty_color_of_rgb theme.stair_up) (notty_color_of_rgb theme.background)
-  | `Environment `StairsDown ->
+  | `StairsDown ->
     stairs_down
       (notty_color_of_rgb theme.stair_down)
       (notty_color_of_rgb theme.background)
-  | `Environment `Fog -> solid (notty_color_of_rgb theme.fog ~alpha)
-  | `Environment (`Hidden i) ->
+  | `Fog -> solid (notty_color_of_rgb theme.fog ~alpha)
+  | `Hidden i ->
     hidden_background
       (notty_color_of_rgb theme.fog)
       (notty_color_of_rgb theme.background)
       i
-  | `Environment `Visible -> solid (notty_color_of_rgb theme.background)
+  | `Visible -> solid (notty_color_of_rgb theme.background)
 ;;

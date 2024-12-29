@@ -14,13 +14,13 @@ let fog_env (theme_name : Theme_t.theme_name) distance_sq view_radius_sq =
   then (
     let distance = sqrt distance_sq in
     let view_radius = view_radius_sq |> sqrt in
-    World.get_render
+    World.render_tile
       theme_name
       (`Environment `Fog)
       ~alpha:(1.0 -. ((distance -. view_radius) /. 20.0)))
   else if distance_sq = view_radius_sq
-  then World.get_render theme_name (`Environment (`Hidden 0))
-  else World.get_render theme_name (`Environment `Visible)
+  then World.render_tile theme_name (`Environment (`Hidden 0))
+  else World.render_tile theme_name (`Environment `Visible)
 ;;
 
 let render_entity (theme_name : Theme_t.theme_name) entity_type distance_sq view_radius_sq
@@ -31,7 +31,7 @@ let render_entity (theme_name : Theme_t.theme_name) entity_type distance_sq view
   let scale =
     5.0 *. Base.Float.clamp_exn (visibility_ratio *. visibility_ratio) ~min:0.0 ~max:1.0
   in
-  World.get_render theme_name entity_type ~alpha:scale
+  World.render_tile theme_name entity_type ~alpha:scale
 ;;
 
 let dist_sq (ax, ay) (bx, by) =
@@ -77,7 +77,7 @@ let render ~me terminal Game.WireFormat.{ config; entities; _ } =
     | _
       when is_outside global_position config
            && is_visible distance_from_player view_radius_sq ->
-      World.get_render config.theme_name (`Environment `Wall)
+      World.render_tile config.theme_name (`Environment `Wall)
     | _ -> fog_env config.theme_name (float_of_int distance_from_player) view_radius_sq
   in
   Term.image terminal image

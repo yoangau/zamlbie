@@ -34,9 +34,9 @@ let notty_color_of_rgb ?alpha (rgb : Theme.rgb) =
       ~b:(scale_channel rgb.b a)
 ;;
 
-let get_render ?(alpha = 1.0) theme_name entity_type =
+let render_tile ?(alpha = 1.0) theme_name tile =
   let theme = Theme.get_theme_by_name theme_name in
-  match entity_type with
+  match tile with
   | `Player `Human -> solid (notty_color_of_rgb theme.human)
   | `Player `Zombie -> solid (notty_color_of_rgb theme.zombie ~alpha)
   | `Environment `Wall -> solid (notty_color_of_rgb theme.wall)

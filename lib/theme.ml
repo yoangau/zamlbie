@@ -251,12 +251,7 @@ let themes_list =
 ;;
 
 let themes = ThemeMap.of_list themes_list
-
-let get_theme_by_name name =
-  let _, default_theme_value = default_theme in
-  try ThemeMap.find name themes with
-  | Not_found -> default_theme_value
-;;
+let get_theme_by_name name = ThemeMap.find name themes
 
 let get_theme_by_index index =
   let theme_count = List.length themes_list in

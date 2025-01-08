@@ -60,7 +60,7 @@ let match_orchestrator match_id =
     Hashtbl.iter players ~f:(fun coms -> coms.Match.mailbox <- None)
   in
   let apply_in_game_effects game_match =
-    Effects.(apply InGame.effects game_match.state) |> Match.update_game_state game_match
+    Effects.(apply Tick.effects game_match.state) |> Match.update_game_state game_match
   in
   let game_match = Match.Registry.find_exn match_id in
   let%lwt () = Lwt_condition.wait game_match.started in

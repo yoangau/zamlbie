@@ -46,27 +46,24 @@ type theme =
     fog : rgb
   }
 
-(*
- * The colors are from 0 to 5 inclusive see Notty.A.rgb
- *)
 let colors =
   ColorMap.of_list
-    [ (`Red, { r = 5; g = 0; b = 0 });
-      (`Green, { r = 0; g = 5; b = 0 });
-      (`Blue, { r = 0; g = 0; b = 5 });
-      (`Yellow, { r = 5; g = 5; b = 0 });
-      (`Cyan, { r = 0; g = 5; b = 5 });
-      (`Magenta, { r = 5; g = 0; b = 5 });
-      (`Orange, { r = 5; g = 3; b = 0 });
-      (`Purple, { r = 3; g = 0; b = 3 });
-      (`Pink, { r = 5; g = 3; b = 4 });
-      (`Lime, { r = 2; g = 4; b = 2 });
-      (`Teal, { r = 0; g = 3; b = 3 });
-      (`Brown, { r = 3; g = 1; b = 1 });
-      (`Gray, { r = 3; g = 3; b = 3 });
-      (`White, { r = 5; g = 5; b = 5 });
+    [ (`Red, { r = 255; g = 0; b = 0 });
+      (`Green, { r = 0; g = 255; b = 0 });
+      (`Blue, { r = 0; g = 0; b = 255 });
+      (`Yellow, { r = 255; g = 255; b = 0 });
+      (`Cyan, { r = 0; g = 255; b = 255 });
+      (`Magenta, { r = 255; g = 0; b = 255 });
+      (`Orange, { r = 255; g = 153; b = 0 });
+      (`Purple, { r = 153; g = 0; b = 153 });
+      (`Pink, { r = 255; g = 153; b = 204 });
+      (`Lime, { r = 102; g = 204; b = 102 });
+      (`Teal, { r = 0; g = 153; b = 153 });
+      (`Brown, { r = 153; g = 51; b = 51 });
+      (`Gray, { r = 153; g = 153; b = 153 });
+      (`White, { r = 255; g = 255; b = 255 });
       (`Black, { r = 0; g = 0; b = 0 });
-      (`Gold, { r = 5; g = 4; b = 0 })
+      (`Gold, { r = 255; g = 204; b = 0 })
     ]
 ;;
 

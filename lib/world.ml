@@ -25,10 +25,10 @@ let scale_channel channel scale =
 
 let notty_color_of_rgb ?alpha (rgb : Theme.rgb) =
   match alpha with
-  | None -> Notty.A.rgb ~r:rgb.r ~g:rgb.g ~b:rgb.b
+  | None -> Notty.A.rgb_888 ~r:rgb.r ~g:rgb.g ~b:rgb.b
   | Some alpha ->
     let a = Base.Float.clamp_exn alpha ~min:0.0 ~max:1.0 in
-    Notty.A.rgb
+    Notty.A.rgb_888
       ~r:(scale_channel rgb.r a)
       ~g:(scale_channel rgb.g a)
       ~b:(scale_channel rgb.b a)

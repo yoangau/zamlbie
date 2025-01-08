@@ -109,7 +109,7 @@ module Start = struct
   let effects = [ generate_walls; generate_stairs; distribute_players; zombie_sortition ]
 end
 
-module InGame = struct
+module Tick = struct
   let stairs_step (game : Game.t) =
     let stairs_up =
       Game.gather_positions

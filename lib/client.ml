@@ -31,12 +31,8 @@ let tile_of_entity (entity_type : Game.WireFormat.entity_type) distance_sq view_
   in
   let tile =
     match entity_type with
-    | `Player `Human -> `Human
-    | `Player `Zombie -> `Zombie
-    | `Environment `Wall -> `Wall
-    | `Environment `Glass -> `Glass
-    | `Environment `StairsUp -> `StairsUp
-    | `Environment `StairsDown -> `StairsDown
+    | `Player player_type -> (player_type :> World.tile)
+    | `Environment env_type -> (env_type :> World.tile)
   in
   (tile, scale)
 ;;

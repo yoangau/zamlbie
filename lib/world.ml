@@ -42,11 +42,11 @@ type tile =
   | `Fog
   ]
 
-let render_tile ?(alpha = 1.0) theme_name (tile : tile) =
+let render_tile ?alpha theme_name (tile : tile) =
   let theme = Theme.get_theme_by_name theme_name in
   match tile with
   | `Human -> solid (notty_color_of_rgb theme.human)
-  | `Zombie -> solid (notty_color_of_rgb theme.zombie ~alpha)
+  | `Zombie -> solid (notty_color_of_rgb theme.zombie ?alpha)
   | `Wall -> solid (notty_color_of_rgb theme.wall)
   | `Glass -> solid (notty_color_of_rgb theme.glass)
   | `StairsUp ->
@@ -55,7 +55,7 @@ let render_tile ?(alpha = 1.0) theme_name (tile : tile) =
     stairs_down
       (notty_color_of_rgb theme.stair_down)
       (notty_color_of_rgb theme.background)
-  | `Fog -> solid (notty_color_of_rgb theme.fog ~alpha)
+  | `Fog -> solid (notty_color_of_rgb theme.fog ?alpha)
   | `Hidden i ->
     hidden_background
       (notty_color_of_rgb theme.fog)

@@ -11,6 +11,9 @@ let parse_args () =
   let max_player_count = ref Config.default_game_config.max_player_count in
   let time_limit = ref Config.default_game_config.time_limit in
   let tick_delta = ref Config.default_game_config.tick_delta in
+  let walls_per_floor = ref Config.default_game_config.walls_per_floor in
+  let staircases_per_floor = ref Config.default_game_config.staircases_per_floor in
+  let number_of_floor = ref Config.default_game_config.number_of_floor in
   let mode = ref None in
   let specs =
     [ ( "--join",
@@ -34,7 +37,14 @@ let parse_args () =
       ("--time-limit", Arg.Set_int time_limit, "Time limit in seconds (default 60)");
       ( "--tick-delta",
         Arg.Set_float tick_delta,
-        "Tick delta time in seconds (default 0.5)" )
+        "Tick delta time in seconds (default 0.5)" );
+      ( "--walls-per-floor",
+        Arg.Set_int walls_per_floor,
+        "Number of walls per floor (default 10)" );
+      ( "--staircases-per-floor",
+        Arg.Set_int staircases_per_floor,
+        "Number of staircases per floor (default 2)" );
+      ("--number-of-floor", Arg.Set_int number_of_floor, "Number of floors (default 3)")
     ]
   in
   let usage_msg = "Usage: client [--join <int> | --create [options]]" in
@@ -57,7 +67,10 @@ let parse_args () =
              max_player_count = !max_player_count;
              time_limit = !time_limit;
              tick_delta = !tick_delta;
-             theme_name = `Default
+             theme_name = `Default;
+             walls_per_floor = !walls_per_floor;
+             staircases_per_floor = !staircases_per_floor;
+             number_of_floor = !number_of_floor
            })
   | _ ->
     Printf.eprintf "Error: specify either --join <int> or --create with options.\n";

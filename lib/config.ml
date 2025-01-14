@@ -10,6 +10,9 @@ let default_game_config : Game.WireFormat.config =
     max_player_count = 2;
     time_limit = 120;
     tick_delta = 0.5;
-    theme_name = `Default
+    theme_name = `Default;
+    walls_per_floor = 10;
+    staircases_per_floor = 2;
+    number_of_floor = 3
   }
 ;;

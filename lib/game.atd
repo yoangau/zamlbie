@@ -22,7 +22,10 @@ type config =
     max_player_count : int;
     time_limit : int;
     tick_delta : float;
-    theme_name : theme_name
+    theme_name : theme_name;
+    walls_per_floor : int;
+    staircases_per_floor : int;
+    number_of_floor : int
   }
 
 type game =

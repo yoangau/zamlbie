@@ -3,10 +3,11 @@ let apply effects game = List.fold_left (fun game action -> action game) game ef
 module Start = struct
   let generate_walls (game : Game.t) =
     let width, height = (game.config.width, game.config.height) in
+    let number_of_floor = game.config.number_of_floor in
     let create_wall x y z =
       Game.{ default_entity with x; y; z; entity_type = `Environment `Wall }
     in
-    let rec generate_random_walls n acc =
+    let rec generate_random_walls_per_floor z n acc =
       if n <= 0
       then acc
       else (
@@ -18,16 +19,22 @@ module Start = struct
           (match orientation with
            | 0 ->
              List.init length (fun i ->
-               if x + i < width then Some (create_wall (x + i) y 0) else None)
+               if x + i < width then Some (create_wall (x + i) y z) else None)
            | _ ->
              List.init length (fun i ->
-               if y + i < height then Some (create_wall x (y + i) 0) else None))
+               if y + i < height then Some (create_wall x (y + i) z) else None))
           |> List.filter_map Fun.id
         in
-        generate_random_walls (n - 1) (new_wall @ acc))
+        generate_random_walls_per_floor z (n - 1) (new_wall @ acc))
     in
-    let num_random_walls = 10 in
-    let walls = generate_random_walls num_random_walls [] in
+    let generate_walls_for_all_floors acc z =
+      let num_random_walls = game.config.walls_per_floor in
+      generate_random_walls_per_floor z num_random_walls acc
+    in
+    let walls =
+      List.init number_of_floor (fun z -> generate_walls_for_all_floors [] z)
+      |> List.flatten
+    in
     List.fold_left (fun game wall -> Game.add_entity game wall |> snd) game walls
   ;;
 
@@ -36,12 +43,23 @@ module Start = struct
       Game.gather_positions ~p:(fun e -> e = `Environment `Wall) ~entities:game.entities
     in
     let valid_stairs (x, y, z) =
+      (* no wall on the staircase going up origin*)
       (not @@ Game.Set.mem (x, y, z) walls)
+      (* no wall on the staircase going down origin*)
       && (not @@ Game.Set.mem (x, y + 1, z + 1) walls)
+      (* no wall on the staircase going up destination*)
+      && (not @@ Game.Set.mem (x, y, z + 1) walls)
+      (* no wall on the staircase going down destination*)
+      && (not @@ Game.Set.mem (x, y - 1, z) walls)
     in
-    let width, height, max_z = (game.config.width, game.config.height, 2) in
-    let random_pos _ = (Random.int width, Random.int height, Random.int max_z) in
-    let stair_case_count = 10 in
+    let width, height, max_z =
+      (game.config.width, game.config.height, game.config.number_of_floor - 1)
+    in
+    (* random position excluding the border *)
+    let rec find_valid_pos z =
+      let x, y = (Random.int width, Random.int (height - 2) + 1) in
+      if valid_stairs (x, y, z) then (x, y, z) else find_valid_pos z
+    in
     let create stairs (x, y, z) =
       Game.{ default_entity with x; y; z; entity_type = `Environment stairs }
     in
@@ -49,8 +67,9 @@ module Start = struct
       [ create `StairsUp (x, y, z); create `StairsDown (x, y + 1, z + 1) ]
     in
     let stairs =
-      List.init stair_case_count random_pos
-      |> List.filter valid_stairs
+      List.init max_z (fun z ->
+        List.init game.config.staircases_per_floor (fun _ -> find_valid_pos z))
+      |> List.flatten
       |> List.map create_updown
       |> List.flatten
     in

@@ -132,3 +132,36 @@ let join_game terminal game_id =
   let receive = receive client_id terminal in
   Ws_client.client uri receive send_player_input
 ;;
+
+let offline_game terminal config =
+  let game_update_message player_id game =
+    let entities, _ = Game.partition_map player_id game in
+    Game.WireFormat.wire_format ~game_id:game.game_id ~config:game.config ~entities
+  in
+  let game =
+    let game = Game.make 0 config in
+    let game_with_player = Game.add_entity game Game.default_entity |> snd in
+    ref @@ Effects.(apply Start.effects game_with_player)
+  in
+  Lwt_stream.map_s
+    (function
+      | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Move move)
+      | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
+      | _ -> Lwt.return @@ None)
+    (Term.events terminal)
+  |> Lwt_stream.iter_s (function
+    | Some (`Move move) ->
+      let walls =
+        Game.gather_positions
+          ~p:(fun e ->
+            let open Stdlib in
+            e = `Environment `Wall)
+          ~entities:!game.entities
+      in
+      let () =
+        Game.move ~walls ~game:!game ~entity_id:0 ~move
+        |> Option.iter (fun ngame -> game := ngame)
+      in
+      render ~me:0 terminal (game_update_message 0 !game)
+    | _ -> exit 1)
+;;

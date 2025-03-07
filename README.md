@@ -69,9 +69,8 @@ dune exec client -- --test
 ```
 
 ### Game Controls
-- Use arrow keys or WASD to move your character
+- Use arrow keys to move your character
 - Press ESC to exit the game at any time
-- More controls are displayed in-game
 
 ### Game Customization
 You can customize various aspects of the game when creating a new session:

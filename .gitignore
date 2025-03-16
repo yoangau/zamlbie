@@ -27,3 +27,7 @@ setup.log
 
 # Local OPAM switch
 _opam/
+
+zamlbie_env
+
+.DS_Store

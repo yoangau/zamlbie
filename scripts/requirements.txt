@@ -1,0 +1,2 @@
+# Requirements for Zamlbie testing scripts
+pynput==1.7.6

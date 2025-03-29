@@ -1,0 +1,6 @@
+(library
+ (name network)
+ (modules ws_client rest_client)
+ (libraries websocket-lwt-unix base lwt.unix dream)
+ (preprocess
+  (pps lwt_ppx)))

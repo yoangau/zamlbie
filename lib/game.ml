@@ -13,7 +13,7 @@ type entity = WireFormat.entity
 
 type t =
   { game_id : int;
-    entities : (Base.Int.t, entity) Base.Hashtbl.t;
+    entities : (Uuid.HashtblKey.t, entity) Base.Hashtbl.t;
     config : config
   }
 
@@ -25,7 +25,7 @@ let is_entity a b = WireFormat.(a.id = b.id)
 let find_entity { entities; _ } id = Base.Hashtbl.find entities id
 let find_entity_exn { entities; _ } id = Base.Hashtbl.find_exn entities id
 
-module Set = Set.Make (struct
+module Positions = Set.Make (struct
     type t = int * int * int
 
     let compare = Stdlib.compare
@@ -34,9 +34,9 @@ module Set = Set.Make (struct
 let gather_positions ~p ~entities =
   Base.Hashtbl.fold
     entities
-    ~init:Set.empty
+    ~init:Positions.empty
     ~f:(fun ~key:_ ~data:WireFormat.{ entity_type; x; y; z; _ } positions ->
-      if p entity_type then Set.add (x, y, z) positions else positions)
+      if p entity_type then Positions.add (x, y, z) positions else positions)
 ;;
 
 let partition_map id game =
@@ -45,12 +45,13 @@ let partition_map id game =
     let w, h = (21, 21) in
     List.init w (fun x -> List.init h (fun y -> (px + x - (w / 2), py + y - (h / 2), pz)))
     |> List.flatten
-    |> Set.of_list
+    |> Positions.of_list
   in
   ( game.entities
     |> Base.Hashtbl.data
-    |> List.filter (fun ({ x; y; z; _ } : entity) -> Set.mem (x, y, z) positions_to_send),
-    Theme.get_theme_by_index pz )
+    |> List.filter (fun ({ x; y; z; _ } : entity) ->
+      Positions.mem (x, y, z) positions_to_send),
+    Theme.name_from_index pz )
 ;;
 
 let make game_id config =
@@ -83,7 +84,7 @@ let move ~walls ~game ~entity_id ~move =
     ( Base.Int.clamp_exn (entity.x + dx) ~min:0 ~max:(game.config.width - 1),
       Base.Int.clamp_exn (entity.y + dy) ~min:0 ~max:(game.config.height - 1) )
   in
-  if Set.mem (nx, ny, entity.z) walls
+  if Positions.mem (nx, ny, entity.z) walls
   then None
   else Some (update_entity game { entity with x = nx; y = ny })
 ;;

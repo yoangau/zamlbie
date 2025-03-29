@@ -54,12 +54,12 @@ let render ~me terminal Game.WireFormat.{ config; entities; _ } =
     Map.of_list
       (List.map (fun entity -> Game.WireFormat.((entity.x, entity.y), entity)) entities)
   in
-  let Game.WireFormat.{ x = mx; y = my; entity_type; _ } =
+  let Game.WireFormat.{ x = mx; y = my; entity_type = player_entity_type; _ } =
     List.find (fun e -> e.Game.WireFormat.id = me) entities
   in
   let view_radius_sq =
     let vr =
-      match entity_type with
+      match player_entity_type with
       | `Player `Human -> config.human_view_radius
       | `Player `Zombie -> config.zombie_view_radius
       | _ -> failwith "Player should be Player type"
@@ -73,17 +73,17 @@ let render ~me terminal Game.WireFormat.{ config; entities; _ } =
     let gx = mx + wx - (window_width / 2) in
     let gy = my + wy - (window_height / 2) in
     let global_position = (gx, gy) in
-    let distance_from_player = dist_sq global_position (mx, my) in
+    let distance_sq_from_player = dist_sq global_position (mx, my) in
     let tile, alpha =
       match Map.find_opt (gx, gy) entities_set with
-      | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
-        tile_of_entity entity_type distance_from_player view_radius_sq
+      | Some { entity_type; _ } when is_visible distance_sq_from_player view_radius_sq ->
+        tile_of_entity entity_type distance_sq_from_player view_radius_sq
       | _
-        when is_outside global_position config
-             && is_visible distance_from_player view_radius_sq -> (`Wall, 1.0)
-      | _ -> tile_of_fog_env (float_of_int distance_from_player) view_radius_sq
+        when is_visible distance_sq_from_player view_radius_sq
+             && is_outside global_position config -> (`Wall, 1.0)
+      | _ -> tile_of_fog_env (float_of_int distance_sq_from_player) view_radius_sq
     in
-    World.render_tile config.theme_name tile ~alpha
+    World.render_tile (Theme.from_name config.theme_name) tile ~alpha
   in
   Term.image terminal image
 ;;
@@ -121,8 +121,8 @@ let create_game config =
   let open Lwt.Infix in
   let open Game.WireFormat in
   let url = Config.server_url ^ "/create_game" in
-  Rest_client.post url (Serializer.string_of_config config)
-  >>= fun s -> Option.map Serializer.game_of_string s |> Lwt.return
+  Network.Rest_client.post url (Serializer.string_of_config config)
+  >|= fun s -> Option.map Serializer.game_of_string s
 ;;
 
 let join_game terminal game_id =
@@ -130,7 +130,7 @@ let join_game terminal game_id =
   let send_player_input = send_player_input terminal in
   let client_id = ref None in
   let receive = receive client_id terminal in
-  Ws_client.client uri receive send_player_input
+  Network.Ws_client.client uri receive send_player_input
 ;;
 
 let offline_game terminal config =

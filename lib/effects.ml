@@ -44,13 +44,13 @@ module Start = struct
     in
     let valid_stairs (x, y, z) =
       (* no wall on the staircase going up origin*)
-      (not @@ Game.Set.mem (x, y, z) walls)
+      (not @@ Game.Positions.mem (x, y, z) walls)
       (* no wall on the staircase going down origin*)
-      && (not @@ Game.Set.mem (x, y + 1, z + 1) walls)
+      && (not @@ Game.Positions.mem (x, y + 1, z + 1) walls)
       (* no wall on the staircase going up destination*)
-      && (not @@ Game.Set.mem (x, y, z + 1) walls)
+      && (not @@ Game.Positions.mem (x, y, z + 1) walls)
       (* no wall on the staircase going down destination*)
-      && (not @@ Game.Set.mem (x, y - 1, z) walls)
+      && (not @@ Game.Positions.mem (x, y - 1, z) walls)
     in
     let width, height, max_z =
       (game.config.width, game.config.height, game.config.number_of_floor - 1)
@@ -85,7 +85,7 @@ module Start = struct
         ~entities:game.entities
     in
     let is_occupied occupied_cells pos =
-      List.mem pos occupied_cells || Game.Set.mem pos environment_cells
+      List.mem pos occupied_cells || Game.Positions.mem pos environment_cells
     in
     let width, height = (game.config.width, game.config.height) in
     let rec generate_unique_position occupied_positions =
@@ -140,7 +140,7 @@ module Tick = struct
         ~p:(fun e -> e = `Environment `StairsDown)
         ~entities:game.entities
     in
-    let is_on what Game.WireFormat.{ x; y; z; _ } = Game.Set.mem (x, y, z) what in
+    let is_on what Game.WireFormat.{ x; y; z; _ } = Game.Positions.mem (x, y, z) what in
     let step (entity : Game.entity) =
       match entity.entity_type with
       | `Player _ when is_on stairs_up entity -> { entity with z = entity.z + 1 }
@@ -156,7 +156,7 @@ module Tick = struct
       Game.gather_positions ~p:(fun e -> e = `Player `Zombie) ~entities:game.entities
     in
     let has_zombie_on_same_cell Game.WireFormat.{ x; y; z; _ } =
-      Game.Set.mem (x, y, z) zombies
+      Game.Positions.mem (x, y, z) zombies
     in
     let infect (entity : Game.entity) =
       match entity.entity_type with

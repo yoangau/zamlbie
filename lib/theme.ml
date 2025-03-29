@@ -17,12 +17,6 @@ type color =
   | `Gold
   ]
 
-module ColorMap = Map.Make (struct
-    type t = color
-
-    let compare = compare
-  end)
-
 module ThemeMap = Map.Make (struct
     type t = Theme_t.theme_name
 
@@ -35,7 +29,7 @@ type rgb =
     b : int
   }
 
-type theme =
+type t =
   { background : rgb;
     human : rgb;
     zombie : rgb;
@@ -46,28 +40,24 @@ type theme =
     fog : rgb
   }
 
-let colors =
-  ColorMap.of_list
-    [ (`Red, { r = 255; g = 0; b = 0 });
-      (`Green, { r = 0; g = 255; b = 0 });
-      (`Blue, { r = 0; g = 0; b = 255 });
-      (`Yellow, { r = 255; g = 255; b = 0 });
-      (`Cyan, { r = 0; g = 255; b = 255 });
-      (`Magenta, { r = 255; g = 0; b = 255 });
-      (`Orange, { r = 255; g = 153; b = 0 });
-      (`Purple, { r = 153; g = 0; b = 153 });
-      (`Pink, { r = 255; g = 153; b = 204 });
-      (`Lime, { r = 102; g = 204; b = 102 });
-      (`Teal, { r = 0; g = 153; b = 153 });
-      (`Brown, { r = 153; g = 51; b = 51 });
-      (`Gray, { r = 153; g = 153; b = 153 });
-      (`White, { r = 255; g = 255; b = 255 });
-      (`Black, { r = 0; g = 0; b = 0 });
-      (`Gold, { r = 255; g = 204; b = 0 })
-    ]
+let color_to_rgb = function
+  | `Red -> { r = 255; g = 0; b = 0 }
+  | `Green -> { r = 0; g = 255; b = 0 }
+  | `Blue -> { r = 0; g = 0; b = 255 }
+  | `Yellow -> { r = 255; g = 255; b = 0 }
+  | `Cyan -> { r = 0; g = 255; b = 255 }
+  | `Magenta -> { r = 255; g = 0; b = 255 }
+  | `Orange -> { r = 255; g = 153; b = 0 }
+  | `Purple -> { r = 153; g = 0; b = 153 }
+  | `Pink -> { r = 255; g = 153; b = 204 }
+  | `Lime -> { r = 102; g = 204; b = 102 }
+  | `Teal -> { r = 0; g = 153; b = 153 }
+  | `Brown -> { r = 153; g = 51; b = 51 }
+  | `Gray -> { r = 153; g = 153; b = 153 }
+  | `White -> { r = 255; g = 255; b = 255 }
+  | `Black -> { r = 0; g = 0; b = 0 }
+  | `Gold -> { r = 255; g = 204; b = 0 }
 ;;
-
-let color_to_rgb color = ColorMap.find color colors
 
 let default_theme =
   ( `Default,
@@ -248,10 +238,10 @@ let themes_list =
 ;;
 
 let themes = ThemeMap.of_list themes_list
-let get_theme_by_name name = ThemeMap.find name themes
+let from_name name = ThemeMap.find name themes
+let theme_count = List.length themes_list
 
-let get_theme_by_index index =
-  let theme_count = List.length themes_list in
+let name_from_index index =
   let theme_index = index mod theme_count in
   let theme_name, _ = List.nth themes_list theme_index in
   theme_name

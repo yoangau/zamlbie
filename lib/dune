@@ -46,9 +46,7 @@
   effects
   server
   client
-  ws_client
-  rest_client
-  client_arg
+  cmd
   config
   game
   game_j
@@ -63,6 +61,7 @@
   theme_t
   uuid)
  (libraries
+  network
   websocket-lwt-unix
   base
   notty

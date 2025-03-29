@@ -41,6 +41,9 @@ let send_game_updates game_match =
 
 let match_orchestrator match_id =
   let execute_player_moves game_match =
+    let empty_mailboxes players =
+      Hashtbl.iter players ~f:(fun coms -> coms.Match.mailbox <- None)
+    in
     let walls =
       Game.gather_positions
         ~p:(fun e ->
@@ -57,10 +60,8 @@ let match_orchestrator match_id =
             |> Option.map (fun move ->
               Game.move ~walls ~game:game_match.state ~entity_id ~move)
             |> Option.join
-            |> Option.iter (Match.update_game_state game_match))
-  in
-  let empty_mailboxes players =
-    Hashtbl.iter players ~f:(fun coms -> coms.Match.mailbox <- None)
+            |> Option.iter (Match.update_game_state game_match));
+    empty_mailboxes game_match.Match.players
   in
   let apply_in_game_effects game_match =
     Effects.(apply Tick.effects game_match.state) |> Match.update_game_state game_match
@@ -72,7 +73,6 @@ let match_orchestrator match_id =
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
-    empty_mailboxes game_match.players;
     apply_in_game_effects game_match;
     send_game_updates game_match;
     match Game.verify_end_conditions game_match.state start_time with

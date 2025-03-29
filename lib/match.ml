@@ -1,12 +1,23 @@
 open Base
 
-type player_t =
-  { websocket : Dream.websocket;
-    mutable mailbox : Game.WireFormat.move option
-  }
+module Player = struct
+  type t =
+    { websocket : Dream.websocket;
+      mutable mailbox : Game.WireFormat.move option
+    }
+
+  let make ~ws = { websocket = ws; mailbox = None }
+  let mail move player = player.mailbox <- Some move
+
+  let take_mail player =
+    let old = player.mailbox in
+    player.mailbox <- None;
+    old
+  ;;
+end
 
 type t =
-  { players : (Uuid.HashtblKey.t, player_t) Hashtbl.t;
+  { players : (Uuid.HashtblKey.t, Player.t) Hashtbl.t;
     started : unit Lwt_condition.t;
     mutable state : Game.t
   }
@@ -15,8 +26,7 @@ let update_game_state t new_state = t.state <- new_state
 let player_count t = Hashtbl.length t.players
 
 let mailbox_move t player_id move =
-  Hashtbl.find t.players player_id
-  |> Stdlib.Option.iter (fun player -> player.mailbox <- Some move)
+  Hashtbl.find t.players player_id |> Stdlib.Option.iter (Player.mail move)
 ;;
 
 let players_ws_iter t ~f =
@@ -29,7 +39,7 @@ let start t =
   Lwt_condition.signal t.started ()
 ;;
 
-let try_join_match t websocket =
+let try_join_match t ws =
   let room_size = t.state.config.max_player_count in
   let previous_player_count = player_count t in
   let new_player_count = previous_player_count + 1 in
@@ -40,7 +50,7 @@ let try_join_match t websocket =
       Game.add_entity t.state { Game.default_entity with entity_type = `Player `Human }
     in
     t.state <- game;
-    Hashtbl.set t.players ~key:player_id ~data:{ websocket; mailbox = None };
+    Hashtbl.set t.players ~key:player_id ~data:(Player.make ~ws);
     if new_player_count = room_size then start t;
     Some player_id)
 ;;

@@ -30,7 +30,6 @@ let receive socket =
 ;;
 
 let close_ws = Match.players_ws_iter ~f:(fun ws _ -> Dream.close_websocket ws |> ignore)
-
 let broadcast message = Match.players_ws_iter ~f:(fun ws _ -> send ws message |> ignore)
 
 let send_game_updates game_match =

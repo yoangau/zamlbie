@@ -4,7 +4,7 @@ let server_url = "http://127.0.0.1:7777"
 
 let default_game_config : Game.WireFormat.config =
   { human_view_radius = 8;
-    zombie_view_radius = 4;
+    zombie_view_radius = 6;
     width = 20;
     height = 20;
     max_player_count = 2;

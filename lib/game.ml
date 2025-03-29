@@ -136,9 +136,9 @@ let visible_map id game =
          Set2d.empty
   in
   ( game.entities
-  |> Base.Hashtbl.data
-  |> List.filter (fun ({ x; y; z; _ } : entity) ->
-    z = pz && Set2d.mem (x, y) positions_to_send),
+    |> Base.Hashtbl.data
+    |> List.filter (fun ({ x; y; z; _ } : entity) ->
+      z = pz && Set2d.mem (x, y) positions_to_send),
     Theme.get_theme_by_index pz )
 ;;
 

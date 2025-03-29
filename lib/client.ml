@@ -153,7 +153,8 @@ let offline_game terminal config =
       |> Option.iter (fun ngame -> game := ngame);
       (game := Effects.(apply Tick.effects !game));
       render ~me:0 terminal (game_update_message 0 !game)
-    | _ -> exit 1
+    | Some `Leave -> exit 1
+    | _ -> Lwt.return_unit
   in
   let game = initialize_game config in
   Lwt_stream.map_s

@@ -1,8 +1,6 @@
 open Lwt.Infix
 open Websocket_lwt_unix
 
-let section = Lwt_log.Section.make "client"
-
 let client uri receive send =
   let open Websocket in
   Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system
@@ -35,8 +33,6 @@ let client uri receive send =
     send ()
     |> Lwt_stream.map_s (function
       | Some `Leave ->
-        Lwt_log.debug ~section "Got EOF. Sending a close frame."
-        >>= fun () ->
         write conn (Frame.create ~opcode:Close ())
         >>= fun () ->
         close_sent := true;

@@ -1,1 +1,1 @@
-module Serializer = Message_j
+include Message_j

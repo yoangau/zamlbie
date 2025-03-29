@@ -2,7 +2,7 @@ open Base
 open Lwt.Infix
 
 let send socket message =
-  let serialized = Message.Serializer.string_of_server_message message in
+  let serialized = Message.string_of_server_message message in
   Dream.log "Sending message: %s" serialized;
   Dream.send socket serialized
 ;;
@@ -11,7 +11,7 @@ let game_update_message ?player_id game =
   let entities, theme_name =
     match player_id with
     | None -> (Hashtbl.data game.Game.entities, game.config.theme_name)
-    | Some id -> Game.partition_map id game
+    | Some id -> Game.visible_map id game
   in
   `Update
     (Game.WireFormat.wire_format
@@ -25,11 +25,12 @@ let receive socket =
   >>= function
   | Some message ->
     Dream.log "Raw received message: %s" message;
-    message |> Message.Serializer.client_message_of_string |> Lwt_result.return
+    message |> Message.client_message_of_string |> Lwt_result.return
   | None -> Lwt_result.fail "No message received"
 ;;
 
 let close_ws = Match.players_ws_iter ~f:(fun ws _ -> Dream.close_websocket ws |> ignore)
+
 let broadcast message = Match.players_ws_iter ~f:(fun ws _ -> send ws message |> ignore)
 
 let send_game_updates game_match =
@@ -52,15 +53,13 @@ let match_orchestrator match_id =
       game_match.Match.players
       ~f:
         Stdlib.(
-          fun ~key:entity_id ~data:{ mailbox; _ } ->
-            mailbox
+          fun ~key:entity_id ~data:player ->
+            player
+            |> Match.Player.take_mail
             |> Option.map (fun move ->
               Game.move ~walls ~game:game_match.state ~entity_id ~move)
             |> Option.join
             |> Option.iter (Match.update_game_state game_match))
-  in
-  let empty_mailboxes players =
-    Hashtbl.iter players ~f:(fun coms -> coms.Match.mailbox <- None)
   in
   let apply_in_game_effects game_match =
     Effects.(apply Tick.effects game_match.state) |> Match.update_game_state game_match
@@ -72,7 +71,6 @@ let match_orchestrator match_id =
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
-    empty_mailboxes game_match.players;
     apply_in_game_effects game_match;
     send_game_updates game_match;
     match Game.verify_end_conditions game_match.state start_time with

@@ -92,15 +92,14 @@ let send_player_input terminal () =
   Lwt_stream.map_s
     (function
       | `Key (`Arrow move, []) ->
-        Lwt.return
-        @@ Some (`Message (Message.Serializer.string_of_client_message @@ `Move move))
+        Lwt.return @@ Some (`Message (Message.string_of_client_message @@ `Move move))
       | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
       | _ -> Lwt.return @@ None)
     (Term.events terminal)
 ;;
 
 let receive client_id terminal message =
-  match Message.Serializer.server_message_of_string message with
+  match Message.server_message_of_string message with
   | `Joined assigned_client_id ->
     client_id := Some assigned_client_id;
     Lwt.return ()
@@ -110,7 +109,7 @@ let receive client_id terminal message =
     Lwt.return ()
   | `GameOver character ->
     let%lwt () = Term.release terminal in
-    print_endline @@ Message.Serializer.string_of_character_type character ^ " won!";
+    print_endline @@ Message.string_of_character_type character ^ " won!";
     exit 0
   | `Misc message ->
     print_endline message;
@@ -135,33 +134,33 @@ let join_game terminal game_id =
 
 let offline_game terminal config =
   let game_update_message player_id game =
-    let entities, _ = Game.partition_map player_id game in
+    let entities, _ = Game.visible_map player_id game in
     Game.WireFormat.wire_format ~game_id:game.game_id ~config:game.config ~entities
   in
-  let game =
-    let game = Game.make 0 config in
-    let game_with_player = Game.add_entity game Game.default_entity |> snd in
+  let initialize_game config =
+    let base_game = Game.make 0 config in
+    let game_with_player = Game.add_entity base_game Game.default_entity |> snd in
     ref @@ Effects.(apply Start.effects game_with_player)
   in
+  let handle_input game = function
+    | Some (`Move move) ->
+      let walls =
+        Game.gather_positions
+          ~p:(fun e -> e = `Environment `Wall)
+          ~entities:!game.Game.entities
+      in
+      Game.move ~walls ~game:!game ~entity_id:0 ~move
+      |> Option.iter (fun ngame -> game := ngame);
+      (game := Effects.(apply Tick.effects !game));
+      render ~me:0 terminal (game_update_message 0 !game)
+    | _ -> exit 1
+  in
+  let game = initialize_game config in
   Lwt_stream.map_s
     (function
       | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Move move)
       | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
       | _ -> Lwt.return @@ None)
     (Term.events terminal)
-  |> Lwt_stream.iter_s (function
-    | Some (`Move move) ->
-      let walls =
-        Game.gather_positions
-          ~p:(fun e ->
-            let open Stdlib in
-            e = `Environment `Wall)
-          ~entities:!game.entities
-      in
-      let () =
-        Game.move ~walls ~game:!game ~entity_id:0 ~move
-        |> Option.iter (fun ngame -> game := ngame)
-      in
-      render ~me:0 terminal (game_update_message 0 !game)
-    | _ -> exit 1)
+  |> Lwt_stream.iter_s (handle_input game)
 ;;

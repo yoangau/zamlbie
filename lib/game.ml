@@ -183,7 +183,7 @@ type game_ended =
   | Other of string
 
 let verify_end_conditions game start_time =
-  let _all_zombie entities =
+  let all_zombie entities =
     not
     @@ Base.Hashtbl.exists entities ~f:(fun e ->
       match e.WireFormat.entity_type with

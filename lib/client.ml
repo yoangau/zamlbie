@@ -121,7 +121,7 @@ let create_game config =
   let open Game.WireFormat in
   let url = Config.server_url ^ "/create_game" in
   Rest_client.post url (Serializer.string_of_config config)
-  >>= fun s -> Option.map Serializer.game_of_string s |> Lwt.return
+  >>= fun s -> Result.map Serializer.game_of_string s |> Lwt.return
 ;;
 
 let join_game terminal game_id =

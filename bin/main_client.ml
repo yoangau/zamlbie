@@ -9,8 +9,8 @@ let () =
     | Ok (Client_arg.Create config) ->
       Client.create_game config
       >>= (function
-       | None -> failwith "Game creation failed!"
-       | Some game -> Client.join_game (Notty_lwt.Term.create ()) game.game_id)
+       | Ok game -> Client.join_game (Notty_lwt.Term.create ()) game.game_id
+       | Error err -> failwith (Rest_client.show_error err))
     | Error _ -> failwith "Invalid user input!"
   in
   Lwt_main.run run

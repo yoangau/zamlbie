@@ -194,7 +194,7 @@ let verify_end_conditions game start_time =
   if int_of_float (now -. start_time) >= game.config.time_limit
   then
     Some (Win `Human)
-    (* else if all_zombie game.entities
-       then Some (Win `Zombie) *)
+    else if all_zombie game.entities
+       then Some (Win `Zombie)
   else None
 ;;

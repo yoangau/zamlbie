@@ -125,11 +125,13 @@ let create_game config =
 ;;
 
 let join_game terminal game_id =
+  let open Lwt.Infix in
   let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
   let send_player_input = send_player_input terminal in
   let client_id = ref None in
   let receive = receive client_id terminal in
-  Ws_client.client uri receive send_player_input
+  Ws_client.connect uri
+  >>= fun conn -> Ws_client.async_duplex conn receive send_player_input
 ;;
 
 let offline_game terminal config =

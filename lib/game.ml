@@ -178,7 +178,7 @@ type game_ended =
   | Other of string
 
 let verify_end_conditions game start_time =
-  let all_zombie entities =
+  let _all_zombie entities =
     not
     @@ Base.Hashtbl.exists entities ~f:(fun e ->
       match e.WireFormat.entity_type with
@@ -187,8 +187,9 @@ let verify_end_conditions game start_time =
   in
   let now = Unix.time () in
   if int_of_float (now -. start_time) >= game.config.time_limit
-  then Some (Win `Human)
-  else if all_zombie game.entities
-  then Some (Win `Zombie)
+  then
+    Some (Win `Human)
+    (* else if all_zombie game.entities
+       then Some (Win `Zombie) *)
   else None
 ;;

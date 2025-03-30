@@ -63,6 +63,7 @@
   theme_t
   uuid)
  (libraries
+  cmdliner
   websocket-lwt-unix
   base
   notty

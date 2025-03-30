@@ -93,17 +93,16 @@ let send_player_input terminal () =
     (function
       | `Key (`Arrow move, []) ->
         Lwt.return @@ Some (`Message (Message.string_of_client_message @@ `Move move))
-      | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
+      | `Key (`Escape, []) ->
+        let%lwt () = Term.release terminal in
+        Lwt.return @@ Some `Leave
       | _ -> Lwt.return @@ None)
     (Term.events terminal)
 ;;
 
 let receive client_id terminal message =
   match Message.server_message_of_string message with
-  | `Joined assigned_client_id ->
-    client_id := Some assigned_client_id;
-    Lwt.return ()
-  | `Update updated_game -> render ~me:(Option.get !client_id) terminal updated_game
+  | `Update updated_game -> render ~me:client_id terminal updated_game
   | `Rejected reason ->
     failwith reason |> ignore;
     Lwt.return ()
@@ -114,6 +113,7 @@ let receive client_id terminal message =
   | `Misc message ->
     print_endline message;
     Lwt.return ()
+  | `Joined _ -> failwith "'Joined' should only be received once"
 ;;
 
 let create_game config =
@@ -125,13 +125,17 @@ let create_game config =
 ;;
 
 let join_game terminal game_id =
-  let open Lwt.Infix in
   let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
+  let%lwt conn = Ws_client.connect uri in
+  let%lwt mandated_join_message = Ws_client.receive_one conn in
+  let client_id =
+    match Message.server_message_of_string mandated_join_message with
+    | `Joined assigned_client_id -> assigned_client_id
+    | _ -> failwith "First websocket message from server should be 'Joined'"
+  in
   let send_player_input = send_player_input terminal in
-  let client_id = ref None in
   let receive = receive client_id terminal in
-  Ws_client.connect uri
-  >>= fun conn -> Ws_client.async_duplex conn receive send_player_input
+  Ws_client.duplex conn receive send_player_input
 ;;
 
 let offline_game terminal config =

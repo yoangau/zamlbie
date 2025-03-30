@@ -55,6 +55,12 @@ let try_join_match t ws =
     Some player_id)
 ;;
 
+let disconnect t player_id =
+  let updated_game = Game.remove_entity t.state player_id in
+  t.state <- updated_game;
+  Hashtbl.remove t.players player_id
+;;
+
 module Registry = struct
   open Base
 

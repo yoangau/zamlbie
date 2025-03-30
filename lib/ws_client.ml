@@ -81,3 +81,5 @@ let duplex t receive send =
 ;;
 
 let receive_one t = Lwt_stream.next t.rx
+let send_one t message = send_message t.ws message
+let close t = send_close t.ws t.close_sent

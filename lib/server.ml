@@ -26,7 +26,7 @@ let receive socket =
   | Some message ->
     Dream.log "Raw received message: %s" message;
     message |> Message.client_message_of_string |> Lwt_result.return
-  | None -> Lwt_result.fail "No message received"
+  | None -> Lwt_result.fail "End?"
 ;;
 
 let close_ws = Match.players_ws_iter ~f:(fun ws _ -> Dream.close_websocket ws |> ignore)
@@ -99,7 +99,13 @@ let handle_websocket_connection candidate_match_id player_socket =
          | Ok (`Move move) ->
            Match.mailbox_move game_match player_id move;
            receive_player_input ()
-         | Error _ | _ -> Lwt.return ()
+         | Error _ ->
+           Stdlib.print_endline "disconnect";
+           Match.disconnect game_match player_id;
+           Lwt.return ()
+         | _ ->
+           Stdlib.print_endline "uhh";
+           Lwt.return ()
        in
        receive_player_input ())
 ;;

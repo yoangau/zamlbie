@@ -155,8 +155,13 @@ let add_entity game entity =
   (id, game)
 ;;
 
-let update_entity game new_entity =
-  Base.Hashtbl.set game.entities ~key:new_entity.WireFormat.id ~data:new_entity;
+let remove_entity game entity_id =
+  Base.Hashtbl.remove game.entities entity_id;
+  game
+;;
+
+let update_entity game entity =
+  Base.Hashtbl.set game.entities ~key:entity.WireFormat.id ~data:entity;
   game
 ;;
 

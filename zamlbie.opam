@@ -12,6 +12,7 @@ bug-reports: "https://github.com/yoangau/zamlbie/issues"
 depends: [
   "ocaml" {>= "5.2.0"}
   "dune" {>= "3.16"}
+  "cmdliner"
   "notty"
   "base"
   "dream"

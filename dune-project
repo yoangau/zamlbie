@@ -23,6 +23,7 @@
   (ocaml
    (>= 5.2.0))
   dune
+  cmdliner
   notty
   base
   dream

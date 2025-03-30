@@ -131,7 +131,10 @@ let join_game terminal game_id =
   let client_id =
     match Message.server_message_of_string mandated_join_message with
     | `Joined assigned_client_id -> assigned_client_id
-    | _ -> failwith "First websocket message from server should be 'Joined'"
+    | `Rejected reason ->
+      print_endline ("Joining game failed: " ^ reason);
+      exit 0
+    | _ -> failwith "First websocket message from server should be 'Joined' or 'Rejected'"
   in
   let send_player_input = send_player_input terminal in
   let receive = receive client_id terminal in

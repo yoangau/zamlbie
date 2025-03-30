@@ -54,18 +54,18 @@ dune exec server
 ### Running the client
 ```bash
 # Join an existing game
-dune exec client -- --join <game_id>
+dune exec client -- join <game_id>
 
 # Create a new game with custom parameters
-dune exec client -- --create --width 30 --height 30 --human-view-radius 6
+dune exec client -- create --width 30 --height 30 --human-view-radius 6
 
 # For testing purposes, you can run multiple clients in separate terminals
 dune exec server
-./_build/default/bin/main_client.exe --create --tick-delta 0.01 --max-player-count 2
-./_build/default/bin/main_client.exe --join <game_id>
+./_build/default/bin/main_client.exe create --tick-delta 0.01 --max-player-count 2
+./_build/default/bin/main_client.exe join <game_id>
 
 # For testing in test mode
-dune exec client -- --test
+dune exec client -- test
 ```
 
 ### Game Controls

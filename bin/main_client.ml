@@ -10,7 +10,7 @@ let () =
       Client.create_game config
       >>= (function
        | Ok game -> Client.join_game (Notty_lwt.Term.create ()) game.game_id
-       | Error err -> failwith (Rest_client.show_error err))
+       | Error err -> failwith (Http.Raw_client.show_error err))
   in
   Lwt_main.run run
 ;;

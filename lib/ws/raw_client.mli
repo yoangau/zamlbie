@@ -9,7 +9,7 @@ val connect : Uri.t -> t Lwt.t
 val duplex
   :  t ->
   (string -> unit Lwt.t) ->
-  (unit -> [> `Leave | `Message of string ] option Lwt_stream.t) ->
+  (unit -> [> `Close | `Message of string ] option Lwt_stream.t) ->
   unit Lwt.t
 
 (** [receive_one t] waits for and returns a single message from the WebSocket connection. *)

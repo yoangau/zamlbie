@@ -91,17 +91,16 @@ let render ~me terminal Game.WireFormat.{ config; entities; _ } =
 let send_player_input terminal () =
   Lwt_stream.map_s
     (function
-      | `Key (`Arrow move, []) ->
-        Lwt.return @@ Some (`Message (Message.string_of_client_message @@ `Move move))
+      | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Message (`Move move))
       | `Key (`Escape, []) ->
         let%lwt () = Term.release terminal in
-        Lwt.return @@ Some `Leave
+        Lwt.return @@ Some `Close
       | _ -> Lwt.return @@ None)
     (Term.events terminal)
 ;;
 
 let receive client_id terminal message =
-  match Message.server_message_of_string message with
+  match message with
   | `Update updated_game -> render ~me:client_id terminal updated_game
   | `Rejected reason ->
     failwith reason |> ignore;
@@ -120,16 +119,17 @@ let create_game config =
   let open Lwt.Infix in
   let open Game.WireFormat in
   let url = Config.server_url ^ "/create_game" in
-  Rest_client.post url (Serializer.string_of_config config)
+  Http.Raw_client.post url (Serializer.string_of_config config)
   >>= fun s -> Result.map Serializer.game_of_string s |> Lwt.return
 ;;
 
 let join_game terminal game_id =
+  let open Network in
   let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
-  let%lwt conn = Ws_client.connect uri in
-  let%lwt mandated_join_message = Ws_client.receive_one conn in
+  let%lwt conn = WsClient.connect uri in
+  let%lwt mandated_join_message = WsClient.receive_one conn in
   let client_id =
-    match Message.server_message_of_string mandated_join_message with
+    match mandated_join_message with
     | `Joined assigned_client_id -> assigned_client_id
     | `Rejected reason ->
       print_endline ("Joining game failed: " ^ reason);
@@ -138,7 +138,7 @@ let join_game terminal game_id =
   in
   let send_player_input = send_player_input terminal in
   let receive = receive client_id terminal in
-  Ws_client.duplex conn receive send_player_input
+  WsClient.duplex conn receive send_player_input
 ;;
 
 let offline_game terminal config =
@@ -162,14 +162,14 @@ let offline_game terminal config =
       |> Option.iter (fun ngame -> game := ngame);
       (game := Effects.(apply Tick.effects !game));
       render ~me:0 terminal (game_update_message 0 !game)
-    | Some `Leave -> exit 1
+    | Some `Close -> exit 1
     | _ -> Lwt.return_unit
   in
   let game = initialize_game config in
   Lwt_stream.map_s
     (function
       | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Move move)
-      | `Key (`Escape, []) -> Lwt.return @@ Some `Leave
+      | `Key (`Escape, []) -> Lwt.return @@ Some `Close
       | _ -> Lwt.return @@ None)
     (Term.events terminal)
   |> Lwt_stream.iter_s (handle_input game)

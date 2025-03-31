@@ -45,9 +45,8 @@
  (modules
   effects
   server
+  network
   client
-  ws_client
-  rest_client
   client_arg
   config
   game
@@ -63,7 +62,10 @@
   theme_t
   uuid)
  (libraries
+  ws
+  http
   cmdliner
+  websocket
   websocket-lwt-unix
   base
   notty

@@ -12,6 +12,6 @@ type server_message = [
 
 type client_message = [ 
     | Move of move
-    | Leave
+    | Quit
 ]
  

@@ -54,7 +54,7 @@ let make_rx ws close_sent =
 
 let attach_tx ws close_sent =
   Lwt_stream.map_s (function
-    | Some `Leave -> send_close ws close_sent
+    | Some `Close -> send_close ws close_sent
     | Some (`Message message) -> send_message ws message
     | _ -> Lwt.return_unit)
 ;;

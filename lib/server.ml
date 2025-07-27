@@ -8,16 +8,28 @@ let send socket message =
 ;;
 
 let game_update_message ?player_id game =
-  let entities, theme_name =
+  let entities =
     match player_id with
-    | None -> (Hashtbl.data game.Game.entities, game.config.theme_name)
-    | Some id -> Game.visible_map id game
+    | None -> 
+      (* For global view, convert all server entities to wire entities *)
+      game.Game.entities
+      |> Base.Hashtbl.data 
+      |> List.map ~f:(fun ({ entity_type; id; x; y; _ } : Game.entity) ->
+          Game.WireFormat.{ entity_type; id; x; y; theme = game.Game.config.theme_name })
+    | Some id -> Game.visible_map_relative id game
   in
   `Update
     (Game.WireFormat.wire_format
        ~game_id:game.game_id
-       ~config:{ game.config with theme_name }
        ~entities)
+;;
+
+let game_update_message_for_player player_id game =
+  let relative_entities = Game.visible_map_relative player_id game in
+  `Update
+    (Game.WireFormat.wire_format
+       ~game_id:game.game_id
+       ~entities:relative_entities)
 ;;
 
 let receive socket =
@@ -39,6 +51,13 @@ let send_game_updates game_match =
     game_match
 ;;
 
+let send_game_updates_for_players game_match =
+  Match.players_ws_iter
+    ~f:(fun ws player_id ->
+      send ws (game_update_message_for_player player_id game_match.state) |> ignore)
+    game_match
+;;
+
 let match_orchestrator match_id =
   let execute_player_moves game_match =
     let walls =
@@ -48,7 +67,7 @@ let match_orchestrator match_id =
           e = `Environment `Wall)
         ~entities:game_match.Match.state.entities
     in
-    Hashtbl.iteri
+    Base.Hashtbl.iteri
       game_match.Match.players
       ~f:
         Stdlib.(
@@ -65,13 +84,13 @@ let match_orchestrator match_id =
   in
   let game_match = Match.Registry.find_exn match_id in
   let%lwt () = Lwt_condition.wait game_match.started in
-  send_game_updates game_match;
+  send_game_updates_for_players game_match;
   let start_time = Unix.time () in
   let rec tick () =
     let%lwt () = Lwt_unix.sleep game_match.Match.state.config.tick_delta in
     execute_player_moves game_match;
     apply_in_game_effects game_match;
-    send_game_updates game_match;
+    send_game_updates_for_players game_match;
     match Game.verify_end_conditions game_match.state start_time with
     | None -> tick ()
     | Some (Other _) -> assert false (* future other end state? *)

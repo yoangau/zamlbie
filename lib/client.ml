@@ -7,83 +7,43 @@ module Map = Map.Make (struct
     let compare = Stdlib.compare
   end)
 
-let tile_of_fog_env distance_sq view_radius_sq : World.tile * float =
-  let view_radius_sq = float_of_int view_radius_sq in
-  (* TODO: This will need to be updated... the theme update broke the fog *)
-  if distance_sq > view_radius_sq
-  then (
-    let distance = sqrt distance_sq in
-    let view_radius = view_radius_sq |> sqrt in
-    (`Fog, 1.0 -. ((distance -. view_radius) /. 20.0)))
-  else if distance_sq = view_radius_sq
-  then (`Hidden 0, 1.0)
-  else (`Visible, 1.0)
-;;
-
-let tile_of_entity (entity_type : Game.WireFormat.entity_type) distance_sq view_radius_sq
-  : World.tile * float
-  =
-  let visibility_ratio =
-    1.0 -. (float_of_int distance_sq /. float_of_int view_radius_sq)
-  in
-  let scale =
-    5.0 *. Base.Float.clamp_exn (visibility_ratio *. visibility_ratio) ~min:0.0 ~max:1.0
-  in
-  let tile =
-    match entity_type with
-    | `Player player_type -> (player_type :> World.tile)
-    | `Environment env_type -> (env_type :> World.tile)
-  in
-  (tile, scale)
-;;
-
-let dist_sq (ax, ay) (bx, by) =
-  let dx, dy = (bx - ax, by - ay) in
-  (dx * dx) + (dy * dy)
-;;
-
-let is_visible distance_sq view_radius_sq = distance_sq <= view_radius_sq
-
-let is_outside (x, y) config =
-  x < 0 || x >= config.Game.WireFormat.width || y < 0 || y >= config.height
-;;
-
-let render ~me terminal Game.WireFormat.{ config; entities; _ } =
+let render_relative terminal Game.WireFormat.{ entities; _ } =
   let window_height, window_width = (21, 21) in
+  let center_x, center_y = (window_width / 2, window_height / 2) in
   let entities_set =
     Map.of_list
-      (List.map (fun entity -> Game.WireFormat.((entity.x, entity.y), entity)) entities)
-  in
-  let Game.WireFormat.{ x = mx; y = my; entity_type; _ } =
-    List.find (fun e -> e.Game.WireFormat.id = me) entities
-  in
-  let view_radius_sq =
-    let vr =
-      match entity_type with
-      | `Player `Human -> config.human_view_radius
-      | `Player `Zombie -> config.zombie_view_radius
-      | _ -> failwith "Player should be Player type"
-    in
-    vr * vr
+      (List.map (fun entity -> ((entity.Game.WireFormat.x, entity.Game.WireFormat.y), entity)) entities)
   in
   let image =
     I.tabulate (window_width * 2) window_height
     @@ fun wx wy ->
     let wx = wx / 2 in
-    let gx = mx + wx - (window_width / 2) in
-    let gy = my + wy - (window_height / 2) in
-    let global_position = (gx, gy) in
-    let distance_from_player = dist_sq global_position (mx, my) in
-    let tile, alpha =
-      match Map.find_opt (gx, gy) entities_set with
-      | Some { entity_type; _ } when is_visible distance_from_player view_radius_sq ->
-        tile_of_entity entity_type distance_from_player view_radius_sq
-      | _
-        when is_outside global_position config
-             && is_visible distance_from_player view_radius_sq -> (`Wall, 1.0)
-      | _ -> tile_of_fog_env (float_of_int distance_from_player) view_radius_sq
+    let x = wx - center_x in
+    let y = wy - center_y in
+    let tile, alpha, theme_name =
+      match Map.find_opt (x, y) entities_set with
+      | Some { entity_type; theme; _ } ->
+        (* Server sent an entity for this position - render it at full opacity *)
+        let tile = 
+          match entity_type with
+          | `Player player_type -> (player_type :> World.tile)
+          | `Environment env_type -> (env_type :> World.tile)
+        in
+        (tile, 1.0, theme)
+      | None -> 
+        (* No entity sent by server for this position - render animated fog *)
+        let time = Unix.time () in
+        let noise_x = float_of_int (x + center_x) in
+        let noise_y = float_of_int (y + center_y) in
+        let noise_value = 
+          sin (time *. 0.5 +. noise_x *. 0.1 +. noise_y *. 0.1) *. 0.1 +.
+          sin (time *. 0.3 +. noise_x *. 0.05) *. 0.05 +.
+          cos (time *. 0.7 +. noise_y *. 0.08) *. 0.03
+        in
+        let fog_alpha = 0.8 +. noise_value in
+        (`Fog, Base.Float.clamp_exn fog_alpha ~min:0.6 ~max:1.0, `Default)
     in
-    World.render_tile config.theme_name tile ~alpha
+    World.render_tile theme_name tile ~alpha
   in
   Term.image terminal image
 ;;
@@ -99,9 +59,9 @@ let send_player_input terminal () =
     (Term.events terminal)
 ;;
 
-let receive client_id terminal message =
+let receive _client_id terminal message =
   match message with
-  | `Update updated_game -> render ~me:client_id terminal updated_game
+  | `Update updated_game -> render_relative terminal updated_game
   | `Rejected reason ->
     failwith reason |> ignore;
     Lwt.return ()
@@ -143,8 +103,8 @@ let join_game terminal game_id =
 
 let offline_game terminal config =
   let game_update_message player_id game =
-    let entities, _ = Game.visible_map player_id game in
-    Game.WireFormat.wire_format ~game_id:game.game_id ~config:game.config ~entities
+    let entities = Game.visible_map_relative player_id game in
+    Game.WireFormat.wire_format ~game_id:game.game_id ~entities
   in
   let initialize_game config =
     let base_game = Game.make 0 config in
@@ -161,7 +121,7 @@ let offline_game terminal config =
       Game.move ~walls ~game:!game ~entity_id:0 ~move
       |> Option.iter (fun ngame -> game := ngame);
       (game := Effects.(apply Tick.effects !game));
-      render ~me:0 terminal (game_update_message 0 !game)
+      render_relative terminal (game_update_message 0 !game)
     | Some `Close -> exit 1
     | _ -> Lwt.return_unit
   in

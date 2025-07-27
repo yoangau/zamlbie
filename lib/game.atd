@@ -2,7 +2,7 @@ type theme_name <ocaml from="Theme"> = abstract
 
 type character_type = [ Human | Zombie ]
 
-type environment_type = [ Wall | Glass | StairsUp | StairsDown ]
+type environment_type = [ Wall | Glass | StairsUp | StairsDown | Floor ]
 
 type entity_type = [ Player of character_type | Environment of environment_type ]
 
@@ -11,7 +11,7 @@ type entity =
     id : int;
     x : int;
     y : int;
-    z : int;
+    theme : theme_name;
   }
 
 type config =
@@ -30,7 +30,6 @@ type config =
 
 type game =
   { entities : entity list;
-    config : config;
     game_id : int
   }
 

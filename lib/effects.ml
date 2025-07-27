@@ -110,7 +110,7 @@ module Start = struct
       match (players, positions) with
       | [], _ | _, [] -> []
       | entity :: rest, (x, y, z) :: pos_rest ->
-        let updated_entity = Game.WireFormat.{ entity with x; y; z } in
+        let updated_entity : Game.entity = { entity with x; y; z } in
         updated_entity :: assign_positions rest pos_rest
     in
     let updated_players = assign_positions players all_positions in
@@ -140,7 +140,7 @@ module Tick = struct
         ~p:(fun e -> e = `Environment `StairsDown)
         ~entities:game.entities
     in
-    let is_on what Game.WireFormat.{ x; y; z; _ } = Game.Set3d.mem (x, y, z) what in
+    let is_on what ({ x; y; z; _ } : Game.entity) = Game.Set3d.mem (x, y, z) what in
     let step (entity : Game.entity) =
       match entity.entity_type with
       | `Player _ when is_on stairs_up entity -> { entity with z = entity.z + 1 }
@@ -155,7 +155,7 @@ module Tick = struct
     let zombies =
       Game.gather_positions ~p:(fun e -> e = `Player `Zombie) ~entities:game.entities
     in
-    let has_zombie_on_same_cell Game.WireFormat.{ x; y; z; _ } =
+    let has_zombie_on_same_cell ({ x; y; z; _ } : Game.entity) =
       Game.Set3d.mem (x, y, z) zombies
     in
     let infect (entity : Game.entity) =

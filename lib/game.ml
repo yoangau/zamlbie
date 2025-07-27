@@ -2,17 +2,27 @@ module WireFormat = struct
   include Game_t
   module Serializer = Game_j
 
-  let wire_format ~game_id ~config ~entities = { game_id; config; entities }
+  let wire_format ~game_id ~entities = { game_id; entities }
 end
 
 let () = Random.self_init ()
 let entity_id_gen = Uuid.create_gen ()
 
 type config = WireFormat.config
-type entity = WireFormat.entity
 
-let default_entity =
-  WireFormat.{ id = 0; entity_type = `Player `Human; x = 0; y = 0; z = 0 }
+(* Server-side entity with absolute coordinates for game logic *)
+type server_entity = {
+  entity_type : WireFormat.entity_type;
+  id : int;
+  x : int;
+  y : int;
+  z : int;
+}
+
+type entity = server_entity
+
+let default_entity : entity =
+  { id = 0; entity_type = `Player `Human; x = 0; y = 0; z = 0 }
 ;;
 
 type t =
@@ -39,14 +49,15 @@ let gather_positions ~p ~entities =
   Base.Hashtbl.fold
     entities
     ~init:Set3d.empty
-    ~f:(fun ~key:_ ~data:WireFormat.{ entity_type; x; y; z; _ } positions ->
+    ~f:(fun ~key:_ ~data positions ->
+      let { entity_type; x; y; z; _ } = data in
       if p entity_type then Set3d.add (x, y, z) positions else positions)
 ;;
 
 let get_players game =
   Base.Hashtbl.data game.entities
   |> List.filter_map (fun e ->
-    match e.WireFormat.entity_type with
+    match e.entity_type with
     | `Player _ -> Some e
     | _ -> None)
 ;;
@@ -74,7 +85,7 @@ let propagation_costs entities =
   Base.Hashtbl.fold
     entities
     ~init:Costs.empty
-    ~f:(fun ~key:_ ~data:WireFormat.{ x; y; z; entity_type; _ } grid ->
+    ~f:(fun ~key:_ ~data:{ x; y; z; entity_type; _ } grid ->
       match entity_type with
       | `Environment `Wall -> Costs.add (x, y, z) 1000 grid
       | `Environment `Glass -> Costs.add (x, y, z) 1 grid
@@ -121,9 +132,16 @@ let ray ~pos:(x, y) ~deltas ~energy ~propagation_costs =
   step deltas (x, y) energy [ (x, y) ] Set2d.empty
 ;;
 
-let visible_map id game =
-  let WireFormat.{ x = px; y = py; z = pz; _ } = find_entity_exn game id in
-  let energy = 10 in
+
+let visible_map_relative id game =
+  let player_entity = find_entity_exn game id in
+  let { x = px; y = py; z = pz; _ } = player_entity in
+  let energy = 
+    match player_entity.entity_type with
+    | `Player `Human -> game.config.human_view_radius
+    | `Player `Zombie -> game.config.zombie_view_radius
+    | _ -> game.config.human_view_radius
+  in
   let propagation_costs = propagation_costs game.entities in
   let positions_to_send =
     [ `Up; `Down; `Left; `Right ]
@@ -135,11 +153,70 @@ let visible_map id game =
            Set2d.union acc (Set2d.of_list new_positions))
          Set2d.empty
   in
-  ( game.entities
+  let theme = Theme.get_theme_by_index pz in
+  (* Create a set of positions that have real entities *)
+  let real_entities_positions = 
+    game.entities
+    |> Base.Hashtbl.data
+    |> List.filter (fun ({ z; _ } : entity) -> z = pz)
+    |> List.fold_left (fun acc ({ x; y; _ } : entity) -> 
+        Set2d.add (x, y) acc) Set2d.empty
+  in
+  
+  let visible_entities =
+    game.entities
     |> Base.Hashtbl.data
     |> List.filter (fun ({ x; y; z; _ } : entity) ->
-      z = pz && Set2d.mem (x, y) positions_to_send),
-    Theme.get_theme_by_index pz )
+      z = pz && Set2d.mem (x, y) positions_to_send)
+    |> List.map (fun ({ entity_type; id; x; y; _ } : entity) ->
+      WireFormat.{ entity_type; id; x = x - px; y = y - py; theme })
+  in
+  
+  (* Generate floor entities and boundary walls for all visible positions *)
+  let generated_entities = 
+    let entities = ref [] in
+    let entity_id = ref (-1) in (* Counter for virtual entity IDs *)
+    
+    (* Generate virtual entity with unique ID *)
+    let make_virtual_entity entity_type rx ry =
+      decr entity_id;
+      WireFormat.{ 
+        entity_type; 
+        id = !entity_id; (* Use negative IDs for virtual entities *)
+        x = rx; y = ry; theme 
+      }
+    in
+    
+    (* Check each position in the visible area *)
+    Set2d.iter (fun (gx, gy) ->
+      let rx = gx - px in
+      let ry = gy - py in
+      
+      (* Check if this position is at the immediate map boundary (single edge layer) *)
+      let is_boundary_edge = 
+        (gx = -1 && gy >= 0 && gy < game.config.height) ||           (* Left edge *)
+        (gx = game.config.width && gy >= 0 && gy < game.config.height) || (* Right edge *)
+        (gy = -1 && gx >= 0 && gx < game.config.width) ||            (* Top edge *)
+        (gy = game.config.height && gx >= 0 && gx < game.config.width) || (* Bottom edge *)
+        (gx = -1 && gy = -1) ||                                      (* Top-left corner *)
+        (gx = -1 && gy = game.config.height) ||                      (* Bottom-left corner *)
+        (gx = game.config.width && gy = -1) ||                       (* Top-right corner *)
+        (gx = game.config.width && gy = game.config.height)          (* Bottom-right corner *)
+      in
+      
+      if is_boundary_edge then
+        (* Generate boundary wall only at immediate edge *)
+        entities := (make_virtual_entity (`Environment `Wall) rx ry) :: !entities
+      else if (gx >= 0 && gx < game.config.width && gy >= 0 && gy < game.config.height) 
+              && not (Set2d.mem (gx, gy) real_entities_positions) then
+        (* Generate floor for empty visible positions inside the map only *)
+        entities := (make_virtual_entity (`Environment `Floor) rx ry) :: !entities
+    ) positions_to_send;
+    
+    !entities
+  in
+  
+  visible_entities @ generated_entities
 ;;
 
 let get_move_delta = function
@@ -161,7 +238,7 @@ let remove_entity game entity_id =
 ;;
 
 let update_entity game entity =
-  Base.Hashtbl.set game.entities ~key:entity.WireFormat.id ~data:entity;
+  Base.Hashtbl.set game.entities ~key:entity.id ~data:entity;
   game
 ;;
 
@@ -186,7 +263,7 @@ let verify_end_conditions game start_time =
   let all_zombie entities =
     not
     @@ Base.Hashtbl.exists entities ~f:(fun e ->
-      match e.WireFormat.entity_type with
+      match e.entity_type with
       | `Player `Human -> true
       | _ -> false)
   in

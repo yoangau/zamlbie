@@ -21,6 +21,7 @@ depends: [
   "cohttp-lwt-unix"
   "atdgen"
   "lwt"
+  "lwt_ppx"
   "odoc" {with-doc}
 ]
 build: [

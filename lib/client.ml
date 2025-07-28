@@ -118,7 +118,7 @@ let offline_game terminal config =
     | Some (`Move move) ->
       let walls =
         Game.gather_positions
-          ~p:(fun e -> e = `Environment `Wall)
+          ~p:(fun e -> e = `Environment `Wall || e = `Environment `Glass)
           ~entities:!game.Game.entities
       in
       Game.move ~walls ~game:!game ~entity_id:0 ~move

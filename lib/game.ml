@@ -62,12 +62,6 @@ let get_players game =
     | _ -> None)
 ;;
 
-let direction_deltas = function
-  | `Up -> [ (-1, -1); (0, -1); (1, -1) ]
-  | `Down -> [ (-1, 1); (0, 1); (1, 1) ]
-  | `Left -> [ (-1, 1); (-1, 0); (-1, -1) ]
-  | `Right -> [ (1, -1); (1, 0); (1, 1) ]
-;;
 
 module Set2d = Set.Make (struct
     type t = int * int
@@ -92,44 +86,25 @@ let propagation_costs entities =
       | _ -> grid)
 ;;
 
-let ray ~pos:(x, y) ~deltas ~energy ~propagation_costs =
-  let travel_energy dx dy = abs dx + abs dy in
-  let rec step deltas (x, y) energy acc visited =
-    if energy <= 0 || Set2d.mem (x, y) visited
-    then acc
-    else (
-      let new_visited = Set2d.add (x, y) visited in
-      let new_energy =
-        energy - (Costs.find_opt (x, y, 0) propagation_costs |> Option.value ~default:0)
-      in
-      let new_deltas =
-        List.filter_map
-          (fun (dx, dy) ->
-            let next_x, next_y = (x + dx, y + dy) in
-            let next_loss =
-              Costs.find_opt (next_x, next_y, 0) propagation_costs
-              |> Option.value ~default:0
-            in
-            if new_energy - travel_energy dx dy - next_loss > 0
-            then Some (dx, dy)
-            else None)
-          deltas
-      in
-      let will_visit =
-        List.fold_left
-          (fun acc_ (dx, dy) ->
-            step
-              new_deltas
-              (x + dx, y + dy)
-              (new_energy - travel_energy dx dy)
-              acc_
-              new_visited)
-          acc
-          deltas
-      in
-      (x, y) :: will_visit)
+let raycast_visibility ~pos:(px, py, pz) ~energy ~propagation_costs =
+  let num_rays = 32 in
+  let angle_step = 2.0 *. Float.pi /. float_of_int num_rays in
+  
+  let cast_ray angle =
+    let dx, dy = (cos angle, sin angle) in
+    let rec step fx fy energy acc =
+      let x, y = (int_of_float (fx +. 0.5), int_of_float (fy +. 0.5)) in
+      let cost = Costs.find_opt (x, y, pz) propagation_costs |> Option.value ~default:0 in
+      let new_acc = (x, y) :: acc in
+      if cost >= 1000 || energy - cost <= 0 then new_acc
+      else step (fx +. dx *. 0.5) (fy +. dy *. 0.5) (energy - cost - 1) new_acc
+    in
+    step (float_of_int px) (float_of_int py) energy []
   in
-  step deltas (x, y) energy [ (x, y) ] Set2d.empty
+  
+  List.init num_rays (fun i -> float_of_int i *. angle_step)
+  |> List.fold_left (fun acc angle -> List.rev_append (cast_ray angle) acc) []
+  |> List.sort_uniq compare
 ;;
 
 
@@ -144,14 +119,8 @@ let visible_map_relative id game =
   in
   let propagation_costs = propagation_costs game.entities in
   let positions_to_send =
-    [ `Up; `Down; `Left; `Right ]
-    |> List.fold_left
-         (fun acc dir ->
-           let new_positions =
-             ray ~pos:(px, py) ~deltas:(direction_deltas dir) ~energy ~propagation_costs
-           in
-           Set2d.union acc (Set2d.of_list new_positions))
-         Set2d.empty
+    raycast_visibility ~pos:(px, py, pz) ~energy ~propagation_costs
+    |> Set2d.of_list
   in
   let theme = Theme.get_theme_by_index pz in
   (* Create a set of positions that have real entities *)

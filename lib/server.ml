@@ -64,7 +64,7 @@ let match_orchestrator match_id =
       Game.gather_positions
         ~p:(fun e ->
           let open Stdlib in
-          e = `Environment `Wall)
+          e = `Environment `Wall || e = `Environment `Glass)
         ~entities:game_match.Match.state.entities
     in
     Base.Hashtbl.iteri

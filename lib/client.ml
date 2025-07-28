@@ -88,6 +88,32 @@ let create_game config =
   >>= fun s -> Result.map Serializer.game_of_string s |> Lwt.return
 ;;
 
+let list_lobbies () =
+  let open Lwt.Infix in
+  let open Game.WireFormat in
+  let url = Config.server_url ^ "/lobbies" in
+  Http.Raw_client.get url
+  >>= function
+  | Ok body -> 
+    let lobbies = Serializer.lobby_list_of_string body in
+    (match lobbies with
+     | [] -> print_endline "No lobbies available."
+     | _ -> 
+       print_endline "Available Lobbies:";
+       List.iter (fun (lobby : Game.WireFormat.lobby_info) ->
+         Printf.printf "Game %d: %d/%d players (%s)\n" 
+           lobby.game_id 
+           lobby.current_players 
+           lobby.max_players 
+           lobby.config_preview
+       ) lobbies;
+       print_endline "\nUse: dune exec client -- join <game_id>");
+    Lwt.return_unit
+  | Error err -> 
+    Printf.printf "Error fetching lobbies: %s\n" (Http.Raw_client.show_error err);
+    Lwt.return_unit
+;;
+
 let join_game terminal game_id =
   let open Network in
   let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in

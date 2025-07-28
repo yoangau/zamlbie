@@ -64,7 +64,7 @@ let send_player_input terminal () =
     (Term.events terminal)
 ;;
 
-let receive _client_id terminal message =
+let receive terminal message =
   match message with
   | `Update updated_game -> render_relative terminal updated_game
   | `Rejected reason ->
@@ -93,16 +93,14 @@ let join_game terminal game_id =
   let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
   let%lwt conn = WsClient.connect uri in
   let%lwt mandated_join_message = WsClient.receive_one conn in
-  let client_id =
-    match mandated_join_message with
-    | `Joined assigned_client_id -> assigned_client_id
-    | `Rejected reason ->
-      print_endline ("Joining game failed: " ^ reason);
-      exit 0
-    | _ -> failwith "First websocket message from server should be 'Joined' or 'Rejected'"
-  in
+  (match mandated_join_message with
+   | `Joined _assigned_client_id -> ()
+   | `Rejected reason ->
+     print_endline ("Joining game failed: " ^ reason);
+     exit 0
+   | _ -> failwith "First websocket message from server should be 'Joined' or 'Rejected'");
   let send_player_input = send_player_input terminal in
-  let receive = receive client_id terminal in
+  let receive = receive terminal in
   WsClient.duplex conn receive send_player_input
 ;;
 

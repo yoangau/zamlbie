@@ -1,6 +1,8 @@
 type game <ocaml from="Game"> = abstract
 type move <ocaml from="Game"> = abstract
 type character_type <ocaml from="Game"> = abstract
+type config <ocaml from="Game"> = abstract
+type lobby_list <ocaml from="Game"> = abstract
 
 type server_message = [ 
     | Update of game
@@ -13,5 +15,16 @@ type server_message = [
 type client_message = [ 
     | Move of move
     | Quit
+]
+
+type http_request = [
+    | GetLobbies
+    | CreateGame of config
+]
+
+type http_response = [
+    | Lobbies of lobby_list
+    | GameCreated of game
+    | HttpError of string
 ]
  

@@ -141,6 +141,10 @@ let run () =
             Match.Registry.new_match config match_orchestrator |> game_update_message
           in
           Dream.respond @@ Game.WireFormat.Serializer.string_of_game game);
+         (Dream.get "/lobbies"
+          @@ fun _ ->
+          let lobbies = Match.Registry.list_waiting_matches () in
+          Dream.respond @@ Game.WireFormat.Serializer.string_of_lobby_list lobbies);
          (Dream.get "/join/:id"
           @@ fun request ->
           let id = Dream.param request "id" |> Int.of_string in

@@ -84,4 +84,24 @@ module Registry = struct
     Lwt.dont_wait (fun () -> thread match_id) (fun _ -> ());
     new_game
   ;;
+
+  let list_waiting_matches () =
+    Hashtbl.to_alist matches
+    |> List.filter_map ~f:(fun (match_id, match_data) ->
+      if Lwt.is_sleeping (Lwt_condition.wait match_data.started)
+      then (
+        let current_players = player_count match_data in
+        let max_players = match_data.state.config.max_player_count in
+        let config_preview =
+          Printf.sprintf
+            "%dx%d, %d floors"
+            match_data.state.config.width
+            match_data.state.config.height
+            match_data.state.config.number_of_floor
+        in
+        Some
+          Game.WireFormat.
+            { game_id = match_id; current_players; max_players; config_preview })
+      else None)
+  ;;
 end

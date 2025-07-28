@@ -40,3 +40,12 @@ type move =
   | Left
   | Right
   ]
+
+type lobby_info = {
+  game_id : int;
+  current_players : int;
+  max_players : int;
+  config_preview : string;
+}
+
+type lobby_list = lobby_info list

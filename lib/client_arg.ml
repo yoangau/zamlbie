@@ -4,6 +4,7 @@ type command =
   | Create of Game.WireFormat.config
   | Join of int
   | Test of Game.WireFormat.config
+  | List
 
 let game_config_term =
   let open Game.WireFormat in
@@ -41,11 +42,7 @@ let game_config_term =
     Arg.(value & opt float default & info [ short; long ] ~doc)
   in
   let width =
-    opt_int
-      ~short:"w"
-      ~long:"width"
-      Config.default_game_config.width
-      "Width of the game"
+    opt_int ~short:"w" ~long:"width" Config.default_game_config.width "Width of the game"
   in
   let height =
     opt_int
@@ -144,6 +141,7 @@ let join_term =
 
 let create_term = Term.(const (fun config -> Create config) $ game_config_term)
 let test_term = Term.(const (fun config -> Test config) $ game_config_term)
+let list_term = Term.(const List)
 
 let join_cmd =
   let info = Cmd.info "join" ~doc:"Join a game by ID" in
@@ -160,9 +158,14 @@ let test_cmd =
   Cmd.v info test_term
 ;;
 
+let list_cmd =
+  let info = Cmd.info "list" ~doc:"List available lobbies waiting for players" in
+  Cmd.v info list_term
+;;
+
 let main_cmd =
   let info = Cmd.info "client" ~version:"1.0" ~doc:"Multiplayer game client" in
-  Cmd.group info [ join_cmd; create_cmd; test_cmd ]
+  Cmd.group info [ join_cmd; create_cmd; test_cmd; list_cmd ]
 ;;
 
 let parse_args () =

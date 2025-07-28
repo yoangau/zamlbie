@@ -4,8 +4,33 @@ module Start = struct
   let generate_walls (game : Game.t) =
     let width, height = (game.config.width, game.config.height) in
     let number_of_floor = game.config.number_of_floor in
+    let window_probability = game.config.window_probability in
     let create_wall x y z =
       Game.{ default_entity with x; y; z; entity_type = `Environment `Wall }
+    in
+    let add_windows_to_segment wall_segment =
+      let length = List.length wall_segment in
+      if length <= 2 || Random.float 1.0 > window_probability then
+        wall_segment (* No windows for short segments or by chance *)
+      else
+        let num_windows = Random.int 2 + 1 in (* 1-2 windows *)
+        let window_positions = 
+          (* Only place windows in middle positions, not at ends *)
+          let middle_positions = List.init (length - 2) (fun i -> i + 1) in
+          let shuffled = List.sort (fun _ _ -> Random.int 3 - 1) middle_positions in
+          let rec take n lst acc =
+            match (n, lst) with
+            | (0, _) | (_, []) -> List.rev acc
+            | (n, x :: xs) -> take (n - 1) xs (x :: acc)
+          in
+          take (min num_windows (List.length shuffled)) shuffled []
+        in
+        List.mapi (fun i wall_entity ->
+          if List.mem i window_positions then
+            Game.{ wall_entity with entity_type = `Environment `Glass }
+          else
+            wall_entity
+        ) wall_segment
     in
     let rec generate_random_walls_per_floor z n acc =
       if n <= 0
@@ -15,7 +40,7 @@ module Start = struct
         let y = Random.int height in
         let orientation = Random.int 2 in
         let length = Random.int 4 + 2 in
-        let new_wall =
+        let base_wall_segment =
           (match orientation with
            | 0 ->
              List.init length (fun i ->
@@ -25,7 +50,8 @@ module Start = struct
                if y + i < height then Some (create_wall x (y + i) z) else None))
           |> List.filter_map Fun.id
         in
-        generate_random_walls_per_floor z (n - 1) (new_wall @ acc))
+        let wall_segment_with_windows = add_windows_to_segment base_wall_segment in
+        generate_random_walls_per_floor z (n - 1) (wall_segment_with_windows @ acc))
     in
     let generate_walls_for_all_floors acc z =
       let num_random_walls = game.config.walls_per_floor in

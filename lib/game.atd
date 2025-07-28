@@ -25,7 +25,8 @@ type config =
     theme_name : theme_name;
     walls_per_floor : int;
     staircases_per_floor : int;
-    number_of_floor : int
+    number_of_floor : int;
+    window_probability : float
   }
 
 type game =

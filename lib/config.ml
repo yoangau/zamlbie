@@ -13,6 +13,7 @@ let default_game_config : Game.WireFormat.config =
     theme_name = `Default;
     walls_per_floor = 10;
     staircases_per_floor = 2;
-    number_of_floor = 3
+    number_of_floor = 3;
+    window_probability = 0.3
   }
 ;;

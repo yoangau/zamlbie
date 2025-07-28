@@ -81,21 +81,22 @@ let receive terminal message =
 ;;
 
 let create_game config =
-  let open Lwt.Infix in
-  let open Game.WireFormat in
+  let open Lwt.Infix in 
   let url = Config.server_url ^ "/create_game" in
-  Http.Raw_client.post url (Serializer.string_of_config config)
-  >>= fun s -> Result.map Serializer.game_of_string s |> Lwt.return
+  Network.HttpClient.post url (`CreateGame config)
+  >>= function
+  | Ok (`GameCreated game) -> Lwt.return (Ok game)
+  | Ok (`HttpError msg) -> Lwt.return (Error (`ClientError (400, msg)))
+  | Ok _ -> Lwt.return (Error (`UnexpectedError (500, "Invalid response type")))
+  | Error err -> Lwt.return (Error err)
 ;;
 
 let list_lobbies () =
   let open Lwt.Infix in
-  let open Game.WireFormat in
   let url = Config.server_url ^ "/lobbies" in
-  Http.Raw_client.get url
+  Network.HttpClient.get url
   >>= function
-  | Ok body -> 
-    let lobbies = Serializer.lobby_list_of_string body in
+  | Ok (`Lobbies lobbies) -> 
     (match lobbies with
      | [] -> print_endline "No lobbies available."
      | _ -> 
@@ -108,6 +109,12 @@ let list_lobbies () =
            lobby.config_preview
        ) lobbies;
        print_endline "\nUse: dune exec client -- join <game_id>");
+    Lwt.return_unit
+  | Ok (`HttpError msg) -> 
+    Printf.printf "Server error: %s\n" msg;
+    Lwt.return_unit
+  | Ok _ ->
+    Printf.printf "Unexpected response type\n";
     Lwt.return_unit
   | Error err -> 
     Printf.printf "Error fetching lobbies: %s\n" (Http.Raw_client.show_error err);

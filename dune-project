@@ -31,7 +31,8 @@
   websocket-lwt-unix
   cohttp-lwt-unix
   atdgen
-  lwt)
+  lwt
+  lwt_ppx)
  (tags (gamedev)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

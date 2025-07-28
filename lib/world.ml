@@ -49,6 +49,7 @@ let render_tile ?alpha theme_name (tile : tile) =
   | `Zombie -> solid (notty_color_of_rgb theme.zombie ?alpha)
   | `Wall -> solid (notty_color_of_rgb theme.wall)
   | `Glass -> solid (notty_color_of_rgb theme.glass)
+  | `Floor -> solid (notty_color_of_rgb theme.background)
   | `StairsUp ->
     stairs_up (notty_color_of_rgb theme.stair_up) (notty_color_of_rgb theme.background)
   | `StairsDown ->

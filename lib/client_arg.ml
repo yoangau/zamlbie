@@ -18,6 +18,7 @@ let game_config_term =
     walls_per_floor
     staircases_per_floor
     number_of_floor
+    window_probability
     =
     { width;
       height;
@@ -29,7 +30,8 @@ let game_config_term =
       theme_name = `Default;
       walls_per_floor;
       staircases_per_floor;
-      number_of_floor
+      number_of_floor;
+      window_probability
     }
   in
   let opt_int ~short ~long default doc =
@@ -108,6 +110,13 @@ let game_config_term =
       Config.default_game_config.number_of_floor
       "Number of floors"
   in
+  let window_probability =
+    opt_float
+      ~short:"g"
+      ~long:"window-probability"
+      Config.default_game_config.window_probability
+      "Probability of windows appearing in walls (0.0-1.0)"
+  in
   Term.(
     const mk_config
     $ width
@@ -119,7 +128,8 @@ let game_config_term =
     $ tick_delta
     $ walls_per_floor
     $ staircases_per_floor
-    $ number_of_floor)
+    $ number_of_floor
+    $ window_probability)
 ;;
 
 let join_term =

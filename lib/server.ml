@@ -136,15 +136,21 @@ let run () =
        [ (Dream.post "/create_game"
           @@ fun request ->
           let%lwt body = Dream.body request in
-          let config = Game.WireFormat.Serializer.config_of_string body in
+          let http_request = Message.http_request_of_string body in
+          let config = match http_request with
+            | `CreateGame config -> config
+            | `GetLobbies -> failwith "Invalid request type for /create_game"
+          in
           let (`Update game) =
             Match.Registry.new_match config match_orchestrator |> game_update_message
           in
-          Dream.respond @@ Game.WireFormat.Serializer.string_of_game game);
+          let response = `GameCreated game in
+          Dream.respond @@ Message.string_of_http_response response);
          (Dream.get "/lobbies"
           @@ fun _ ->
           let lobbies = Match.Registry.list_waiting_matches () in
-          Dream.respond @@ Game.WireFormat.Serializer.string_of_lobby_list lobbies);
+          let response = `Lobbies lobbies in
+          Dream.respond @@ Message.string_of_http_response response);
          (Dream.get "/join/:id"
           @@ fun request ->
           let id = Dream.param request "id" |> Int.of_string in

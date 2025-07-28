@@ -1,6 +1,6 @@
 (library
  (name http)
- (modules raw_client)
+ (modules raw_client client)
  (libraries websocket-lwt-unix lwt.unix dream)
  (preprocess
   (pps lwt_ppx)))

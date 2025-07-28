@@ -28,3 +28,19 @@ let post url body =
   in
   Cohttp_lwt_unix.Client.post ~headers ~body (Uri.of_string url) >>= handle_response
 ;;
+
+let get url =
+  let open Lwt.Infix in
+  let open Cohttp in
+  let handle_response (resp, body) =
+    let status_code = Response.status resp |> Code.code_of_status in
+    Cohttp_lwt.Body.to_string body
+    >|= fun body_string ->
+    match status_code with
+    | 200 | 201 -> Ok body_string
+    | code when code >= 400 && code < 500 -> Error (`ClientError (code, body_string))
+    | code when code >= 500 -> Error (`ServerError (code, body_string))
+    | _ -> Error (`UnexpectedError (status_code, body_string))
+  in
+  Cohttp_lwt_unix.Client.get (Uri.of_string url) >>= handle_response
+;;

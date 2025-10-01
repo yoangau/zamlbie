@@ -10,26 +10,20 @@ let send socket message =
 let game_update_message ?player_id game =
   let entities =
     match player_id with
-    | None -> 
+    | None ->
       (* For global view, convert all server entities to wire entities *)
       game.Game.entities
-      |> Base.Hashtbl.data 
+      |> Base.Hashtbl.data
       |> List.map ~f:(fun ({ entity_type; id; x; y; _ } : Game.entity) ->
-          Game.WireFormat.{ entity_type; id; x; y; theme = game.Game.config.theme_name })
+        Game.WireFormat.{ entity_type; id; x; y; theme = game.Game.config.theme_name })
     | Some id -> Game.visible_map_relative id game
   in
-  `Update
-    (Game.WireFormat.wire_format
-       ~game_id:game.game_id
-       ~entities)
+  `Update (Game.WireFormat.wire_format ~game_id:game.game_id ~entities)
 ;;
 
 let game_update_message_for_player player_id game =
   let relative_entities = Game.visible_map_relative player_id game in
-  `Update
-    (Game.WireFormat.wire_format
-       ~game_id:game.game_id
-       ~entities:relative_entities)
+  `Update (Game.WireFormat.wire_format ~game_id:game.game_id ~entities:relative_entities)
 ;;
 
 let receive socket =
@@ -137,7 +131,8 @@ let run () =
           @@ fun request ->
           let%lwt body = Dream.body request in
           let http_request = Message.http_request_of_string body in
-          let config = match http_request with
+          let config =
+            match http_request with
             | `CreateGame config -> config
             | `GetLobbies -> failwith "Invalid request type for /create_game"
           in

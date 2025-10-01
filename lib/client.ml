@@ -11,22 +11,23 @@ let create_animated_fog x y center_x center_y =
   let time = Unix.time () in
   let noise_x = float_of_int (x + center_x) in
   let noise_y = float_of_int (y + center_y) in
-  let noise_value = 
-    sin (time *. 0.5 +. noise_x *. 0.1 +. noise_y *. 0.1) *. 0.1 +.
-    sin (time *. 0.3 +. noise_x *. 0.05) *. 0.05 +.
-    cos (time *. 0.7 +. noise_y *. 0.08) *. 0.03
+  let noise_value =
+    (sin ((time *. 0.5) +. (noise_x *. 0.1) +. (noise_y *. 0.1)) *. 0.1)
+    +. (sin ((time *. 0.3) +. (noise_x *. 0.05)) *. 0.05)
+    +. (cos ((time *. 0.7) +. (noise_y *. 0.08)) *. 0.03)
   in
   let fog_alpha = 0.8 +. noise_value in
   (`Fog, Base.Float.clamp_exn fog_alpha ~min:0.6 ~max:1.0, `Default)
 ;;
-
 
 let render_relative terminal Game.WireFormat.{ entities; _ } =
   let window_height, window_width = (21, 21) in
   let center_x, center_y = (window_width / 2, window_height / 2) in
   let entities_set =
     Map.of_list
-      (List.map (fun entity -> ((entity.Game.WireFormat.x, entity.Game.WireFormat.y), entity)) entities)
+      (List.map
+         (fun entity -> ((entity.Game.WireFormat.x, entity.Game.WireFormat.y), entity))
+         entities)
   in
   let image =
     I.tabulate (window_width * 2) window_height
@@ -38,13 +39,13 @@ let render_relative terminal Game.WireFormat.{ entities; _ } =
       match Map.find_opt (x, y) entities_set with
       | Some { entity_type; theme; _ } ->
         (* Server sent an entity for this position - render with distance-based alpha *)
-        let tile = 
+        let tile =
           match entity_type with
           | `Player player_type -> (player_type :> World.tile)
           | `Environment env_type -> (env_type :> World.tile)
         in
         (tile, 1.0, theme)
-      | None -> 
+      | None ->
         (* No entity sent by server for this position - render animated fog *)
         create_animated_fog x y center_x center_y
     in
@@ -81,7 +82,7 @@ let receive terminal message =
 ;;
 
 let create_game config =
-  let open Lwt.Infix in 
+  let open Lwt.Infix in
   let url = Config.server_url ^ "/create_game" in
   Network.HttpClient.post url (`CreateGame config)
   >>= function
@@ -96,27 +97,29 @@ let list_lobbies () =
   let url = Config.server_url ^ "/lobbies" in
   Network.HttpClient.get url
   >>= function
-  | Ok (`Lobbies lobbies) -> 
+  | Ok (`Lobbies lobbies) ->
     (match lobbies with
      | [] -> print_endline "No lobbies available."
-     | _ -> 
+     | _ ->
        print_endline "Available Lobbies:";
-       List.iter (fun (lobby : Game.WireFormat.lobby_info) ->
-         Printf.printf "Game %d: %d/%d players (%s)\n" 
-           lobby.game_id 
-           lobby.current_players 
-           lobby.max_players 
-           lobby.config_preview
-       ) lobbies;
+       List.iter
+         (fun (lobby : Game.WireFormat.lobby_info) ->
+           Printf.printf
+             "Game %d: %d/%d players (%s)\n"
+             lobby.game_id
+             lobby.current_players
+             lobby.max_players
+             lobby.config_preview)
+         lobbies;
        print_endline "\nUse: dune exec client -- join <game_id>");
     Lwt.return_unit
-  | Ok (`HttpError msg) -> 
+  | Ok (`HttpError msg) ->
     Printf.printf "Server error: %s\n" msg;
     Lwt.return_unit
   | Ok _ ->
     Printf.printf "Unexpected response type\n";
     Lwt.return_unit
-  | Error err -> 
+  | Error err ->
     Printf.printf "Error fetching lobbies: %s\n" (Http.Raw_client.show_error err);
     Lwt.return_unit
 ;;

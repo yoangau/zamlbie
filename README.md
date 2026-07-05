@@ -1,7 +1,7 @@
 # zamlbie
 
 ## Overview
-Zamlbie is a networked multiplayer TUI (Text-based User Interface) zombie infection game written in OCaml. Players can either fight to survive as humans or infect others as zombies in a multi-level themed game environment. The game leverages ATD for type definitions and Dream for both RESTful API and WebSocket connections, featuring dedicated server/client architecture.
+Zamlbie is a networked multiplayer TUI (Text-based User Interface) zombie infection game written in OCaml. Players can either fight to survive as humans or infect others as zombies in a multi-level themed game environment. The game leverages ATD for type definitions and an OCaml 5 multicore stack — Eio for structured concurrency, httpun for the RESTful API and httpun-ws for WebSocket connections — featuring dedicated server/client architecture.
 
 ![Demo of Zamlbie gameplay](img/demo.gif)
 
@@ -14,10 +14,46 @@ Zamlbie is a networked multiplayer TUI (Text-based User Interface) zombie infect
 - **Terminal-based Interface**: Clean, efficient TUI designed for accessibility and performance
 
 ## Technical Stack
-- **Language**: OCaml
-- **API**: (REST + WebSockets)
+- **Language**: OCaml 5 (multicore, effects-based concurrency)
+- **Concurrency**: [Eio](https://github.com/ocaml-multicore/eio) with domains for parallelism
+- **API**: REST + WebSockets ([httpun](https://github.com/anmonteiro/httpun) / [httpun-ws](https://github.com/anmonteiro/httpun-ws) on the server, [cohttp-eio](https://github.com/mirage/ocaml-cohttp) + httpun-ws with [ocaml-tls](https://github.com/mirleft/ocaml-tls) on the client)
 - **Type Definitions**: ATD
 - **Architecture**: Client-Server model
+
+## Server Architecture
+
+The server is built for multicore OCaml and scales across all available
+cores (`Domain.recommended_domain_count`), split between two pools:
+
+- **Accept domains** share a single listening socket. Each connection is
+  handled by direct-style Eio fibers: HTTP requests are answered inline and
+  `/join/:id` upgrades to a websocket session fiber.
+- **Match domains** run one *orchestrator* fiber per game. The orchestrator
+  exclusively owns its game state — no locks around game logic — and many
+  matches multiplex onto each domain since they sleep between ticks.
+
+Cross-domain communication is message-passing only:
+
+- a per-match **inbox** (`Eio.Stream`) carries join/disconnect events
+  (joins are answered through an `Eio.Promise`),
+- a per-player **move mailbox** (`Atomic`) keeps only the latest input,
+- a per-player **outbox** (`Eio.Stream`) carries updates back to the
+  websocket session; sends are non-blocking so a stuck client can never
+  stall a match.
+
+The only shared mutable structures are the match registry (a mutex-guarded
+table) and the atomic id generators.
+
+### Why not OxCaml?
+
+[OxCaml](https://oxcaml.org) (Jane Street's extension of OCaml) was
+considered: its modes/unboxed types are aimed at allocation-critical hot
+loops, which this game doesn't have — the bottleneck here is architecture,
+not data representation. It also requires its own compiler and a patched
+opam overlay, which the httpun/Eio/notty stack isn't guaranteed to track.
+Plain OCaml 5 + Eio gives us the parallelism we need on the stable
+toolchain; the actor design above would port to OxCaml unchanged if that
+ever changes.
 
 ## Installation
 1. Ensure OCaml and OPAM are installed on your system:
@@ -29,7 +65,7 @@ Zamlbie is a networked multiplayer TUI (Text-based User Interface) zombie infect
    
    # Initialize OPAM and install OCaml
    opam init
-   opam switch create 5.2.0  # Project requires OCaml 5.2.0 or higher
+   opam switch create 5.3.0  # Project requires OCaml 5.2.0 or higher
    eval $(opam env)
    ```
 

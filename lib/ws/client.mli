@@ -18,23 +18,16 @@ module Make (S : Serializer) : sig
   (** Type of the WebSocket client *)
   type t
 
-  (** [connect uri] connects to a WebSocket server at the given URI *)
-  val connect : Uri.t -> t Lwt.t
+  (** [connect ~sw ~env uri] connects to a WebSocket server at the given URI *)
+  val connect : sw:Eio.Switch.t -> env:Eio_unix.Stdenv.base -> Uri.t -> t
 
-  (** [receive_one client] receives a single message from the WebSocket *)
-  val receive_one : t -> S.message_in Lwt.t
+  (** [receive_one client] waits for a single message from the WebSocket.
+      @raise End_of_file once the connection is closed. *)
+  val receive_one : t -> S.message_in
 
   (** [send_one client message] sends a single message to the WebSocket *)
-  val send_one : t -> S.message_out -> unit Lwt.t
+  val send_one : t -> S.message_out -> unit
 
   (** [close client] closes the WebSocket connection *)
-  val close : t -> unit Lwt.t
-
-  (** [duplex client receive send] sets up bidirectional communication
-      where [receive] processes incoming messages and [send] provides outgoing messages *)
-  val duplex
-    :  t ->
-    (S.message_in -> unit Lwt.t) ->
-    (unit -> [ `Close | `Message of S.message_out ] option Lwt_stream.t) ->
-    unit Lwt.t
+  val close : t -> unit
 end

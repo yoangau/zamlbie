@@ -1,6 +1,6 @@
 # Multi-stage build for zamlbie server
 # Stage 1: Build the application
-FROM ocaml/opam:debian-12-ocaml-5.2 AS builder
+FROM ocaml/opam:debian-12-ocaml-5.3 AS builder
 
 # Set working directory
 WORKDIR /app
@@ -10,22 +10,9 @@ COPY --chown=opam:opam zamlbie.opam dune-project ./
 
 # Install system dependencies and opam dependencies
 RUN sudo apt-get update && \
-    sudo apt-get install -y pkg-config libssl-dev libev-dev libgmp-dev && \
+    sudo apt-get install -y pkg-config libgmp-dev && \
     opam update && \
-    opam install -y \
-        dune \
-        cmdliner \
-        notty \
-        base \
-        dream \
-        websocket \
-        websocket-lwt-unix \
-        cohttp-lwt-unix \
-        atdgen \
-        atdgen-runtime \
-        yojson \
-        lwt \
-        lwt_ppx
+    opam install -y --deps-only .
 
 # Copy source code
 COPY --chown=opam:opam . .
@@ -36,9 +23,10 @@ RUN eval $(opam env) && dune build bin/main_server.exe --release
 # Stage 2: Runtime image
 FROM debian:12-slim
 
-# Install runtime dependencies
+# Install runtime dependencies (the server itself is pure OCaml; certs are
+# only needed if it ever makes outbound TLS connections)
 RUN apt-get update && \
-    apt-get install -y libev4 libssl3 ca-certificates && \
+    apt-get install -y ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

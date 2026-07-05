@@ -6,7 +6,7 @@ module WsClient = Ws.Client.Make (struct
     let deserialize = Message.server_message_of_string
   end)
 
-module HttpClient = Http.Client.Make (struct
+module HttpClient = Httpc.Client.Make (struct
     type request = Message.http_request
     type response = Message.http_response
 

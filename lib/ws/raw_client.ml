@@ -1,85 +1,142 @@
-open Lwt.Infix
-module WsLwt = Websocket_lwt_unix
+open Eio.Std
 
 type t =
-  { ws : WsLwt.conn;
-    close_sent : bool ref;
-    rx : string Lwt_stream.t
+  { wsd : Httpun_ws.Wsd.t;
+    incoming : Frames.incoming Eio.Stream.t;
+    runtime : Gluten_eio_flow.Client.t;
+    (* Set once [`Eof] has been taken from [incoming]; only late messages
+       already queued behind it remain to be drained. *)
+    mutable draining : bool
   }
 
-let send_close ?content ws close_sent =
-  let open Websocket in
-  WsLwt.write ws (Frame.create ~opcode:Close ?content ())
-  >>= fun () ->
-  close_sent := true;
-  WsLwt.close_transport ws
+let sha1 s = Digestif.SHA1.(digest_string s |> to_raw_string)
+let random_nonce () = String.init 16 (fun _ -> Char.chr (Random.int 256))
+
+let show_error : Httpun_ws.Client_connection.error -> string = function
+  | `Handshake_failure (response, _body) ->
+    Format.asprintf "handshake failure: %a" Httpun.Response.pp_hum response
+  | `Malformed_response reason -> "malformed response: " ^ reason
+  | `Invalid_response_body_length _ -> "invalid response body length"
+  | `Exn exn -> Printexc.to_string exn
 ;;
 
-let send_message ws message =
-  let open Websocket in
-  WsLwt.write ws (Frame.create ~content:message ()) >>= fun _ -> Lwt.return_unit
-;;
-
-let make_rx ws close_sent =
-  let open Websocket in
-  let filter_out _ = Lwt.return_some `Ignore in
-  let close_stream _ = Lwt.return_none in
-  let handle_control_frame ws close_sent frame =
-    let open Websocket.Frame in
-    match frame.opcode with
-    | Ping -> WsLwt.write ws (create ~opcode:Pong ()) >>= filter_out
-    | Close ->
-      (if !close_sent
-       then Lwt.return_unit
-       else if String.length frame.content >= 2
-       then send_close ~content:(String.sub frame.content 0 2) ws close_sent
-       else WsLwt.write ws (Frame.close 1000))
-      >>= fun _ -> WsLwt.close_transport ws >>= close_stream
-    | Pong -> filter_out ()
-    | _ -> WsLwt.close_transport ws >>= close_stream
+let endpoint_of_uri uri =
+  let scheme = Uri.scheme uri |> Option.value ~default:"ws" in
+  let tls =
+    match scheme with
+    | "wss" | "https" -> true
+    | _ -> false
   in
-  let read_frame ws close_sent =
-    WsLwt.read ws
-    >>= fun frame ->
-    match frame.opcode with
-    | Ping | Pong | Close -> handle_control_frame ws close_sent frame
-    | Text | Binary -> Lwt.return_some (`Forward frame.content)
-    | _ -> Lwt.return_some `Ignore
+  let host =
+    match Uri.host uri with
+    | Some host -> host
+    | None -> invalid_arg "websocket url without host"
   in
-  Lwt_stream.from (fun () -> read_frame ws close_sent)
-  |> Lwt_stream.filter_map (function
-    | `Forward content -> Some content
-    | _ -> None)
+  let port = Uri.port uri |> Option.value ~default:(if tls then 443 else 80) in
+  let resource =
+    match Uri.path_and_query uri with
+    | "" -> "/"
+    | resource -> resource
+  in
+  (tls, host, port, resource)
 ;;
 
-let attach_tx ws close_sent =
-  Lwt_stream.map_s (function
-    | Some `Close -> send_close ws close_sent
-    | Some (`Message message) -> send_message ws message
-    | _ -> Lwt.return_unit)
+let connect_flow ~sw ~net ~tls ~host ~port =
+  let addresses = Eio.Net.getaddrinfo_stream net host ~service:(string_of_int port) in
+  let address =
+    match addresses with
+    | address :: _ -> address
+    | [] -> failwith (Printf.sprintf "cannot resolve %s:%d" host port)
+  in
+  let socket = Eio.Net.connect ~sw net address in
+  if tls
+  then
+    (Net_support.wrap_tls
+       ~host
+       (socket :> [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] r)
+      :> [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] r)
+  else (socket :> [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] r)
 ;;
 
-let make ws =
-  let close_sent = ref false in
-  { ws; close_sent; rx = make_rx ws close_sent }
+let connect ~sw ~env uri =
+  let net = Eio.Stdenv.net env in
+  let tls, host, port, resource = endpoint_of_uri uri in
+  let flow = connect_flow ~sw ~net ~tls ~host ~port in
+  let incoming = Frames.create_incoming () in
+  let connected, resolve_connected = Promise.create () in
+  let websocket_handler wsd =
+    Promise.resolve resolve_connected (Ok wsd);
+    Frames.handlers ~wsd incoming
+  in
+  let error_handler error =
+    if Promise.is_resolved connected
+    then Eio.Stream.add incoming `Eof
+    else Promise.resolve resolve_connected (Error (show_error error))
+  in
+  let connection =
+    Httpun_ws.Client_connection.connect
+      ~nonce:(random_nonce ())
+      ~headers:(Httpun.Headers.of_list [ ("host", host ^ ":" ^ string_of_int port) ])
+      ~sha1
+      ~error_handler
+      ~websocket_handler
+      resource
+  in
+  let runtime =
+    Gluten_eio_flow.Client.create
+      ~sw
+      ~read_buffer_size:0x1000
+      ~protocol:(module Httpun_ws.Client_connection)
+      connection
+      flow
+  in
+  match Promise.await connected with
+  | Ok wsd -> { wsd; incoming; runtime; draining = false }
+  | Error reason -> failwith ("websocket connection failed: " ^ reason)
 ;;
 
-let connect uri : t Lwt.t =
-  let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
-  Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system
-  >>= fun endp ->
-  Conduit_lwt_unix.endp_to_client ~ctx endp
-  >>= fun client -> WsLwt.connect ~ctx client uri >|= make
+(* Raises [End_of_file] once the connection is gone.
+
+   httpun-ws can notify the connection-level eof *before* delivering frames
+   that were already buffered (e.g. a final message the peer sent right
+   before closing). Those deliveries happen synchronously before this
+   consumer fiber wakes up, so when we take [`Eof] any late messages are
+   already queued behind it: keep draining them before reporting eof. *)
+let receive_one t =
+  let take_late () =
+    match Eio.Stream.take_nonblocking t.incoming with
+    | Some (`Msg message) -> message
+    | Some `Eof | None -> raise End_of_file
+  in
+  if t.draining
+  then take_late ()
+  else (
+    match Eio.Stream.take t.incoming with
+    | `Msg message -> message
+    | `Eof ->
+      t.draining <- true;
+      take_late ())
 ;;
 
-let duplex t receive send =
-  let sending = attach_tx t.ws t.close_sent (send ()) in
-  let receiving = Lwt_stream.map_s receive t.rx in
-  [ sending; receiving ]
-  |> Lwt_stream.choose
-  |> Lwt_stream.iter_s (fun _ -> Lwt.return ())
+(* Sending on a connection the peer is closing is a no-op, not an error: the
+   reader will surface [`Eof] shortly. *)
+let send_one t message =
+  if not (Httpun_ws.Wsd.is_closed t.wsd)
+  then (
+    (* [send_bytes] masks (mutates) the buffer on clients, so copy. *)
+    let payload = Bytes.of_string message in
+    try
+      Httpun_ws.Wsd.send_bytes
+        t.wsd
+        ~kind:`Text
+        payload
+        ~off:0
+        ~len:(Bytes.length payload)
+    with
+    | Failure _ -> ())
 ;;
 
-let receive_one t = Lwt_stream.next t.rx
-let send_one t message = send_message t.ws message
-let close t = send_close t.ws t.close_sent
+let close t =
+  if not (Httpun_ws.Wsd.is_closed t.wsd) then Httpun_ws.Wsd.close t.wsd;
+  ignore (Gluten_eio_flow.Client.shutdown t.runtime : unit Promise.t)
+;;

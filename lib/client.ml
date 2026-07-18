@@ -1,5 +1,5 @@
 open Notty
-open Notty_lwt
+open Eio.Std
 
 module Map = Map.Make (struct
     type t = int * int
@@ -51,52 +51,23 @@ let render_relative terminal Game.WireFormat.{ entities; _ } =
     in
     World.render_tile theme_name tile ~alpha
   in
-  Term.image terminal image
+  Notty_eio.Term.image terminal image
 ;;
 
-let send_player_input terminal () =
-  Lwt_stream.map_s
-    (function
-      | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Message (`Move move))
-      | `Key (`Escape, []) ->
-        let%lwt () = Term.release terminal in
-        Lwt.return @@ Some `Close
-      | _ -> Lwt.return @@ None)
-    (Term.events terminal)
+let create_game ~env ~server_url config =
+  let url = server_url ^ "/create_game" in
+  (* Use 60 second timeout for create_game to handle cold startup *)
+  match Network.HttpClient.post ~env ~timeout:60.0 url (`CreateGame config) with
+  | Ok (`GameCreated game) -> Ok game
+  | Ok (`HttpError msg) -> Error (`ClientError (400, msg))
+  | Ok _ -> Error (`UnexpectedError (500, "Invalid response type"))
+  | Error err -> Error err
 ;;
 
-let receive terminal message =
-  match message with
-  | `Update updated_game -> render_relative terminal updated_game
-  | `Rejected reason ->
-    failwith reason |> ignore;
-    Lwt.return ()
-  | `GameOver character ->
-    let%lwt () = Term.release terminal in
-    print_endline @@ Message.string_of_character_type character ^ " won!";
-    exit 0
-  | `Misc message ->
-    print_endline message;
-    Lwt.return ()
-  | `Joined _ -> failwith "'Joined' should only be received once"
-;;
-
-let create_game config =
-  let open Lwt.Infix in
-  let url = Config.server_url ^ "/create_game" in
-  Network.HttpClient.post url (`CreateGame config)
-  >>= function
-  | Ok (`GameCreated game) -> Lwt.return (Ok game)
-  | Ok (`HttpError msg) -> Lwt.return (Error (`ClientError (400, msg)))
-  | Ok _ -> Lwt.return (Error (`UnexpectedError (500, "Invalid response type")))
-  | Error err -> Lwt.return (Error err)
-;;
-
-let list_lobbies () =
-  let open Lwt.Infix in
-  let url = Config.server_url ^ "/lobbies" in
-  Network.HttpClient.get url
-  >>= function
+let list_lobbies ~env ~server_url () =
+  let url = server_url ^ "/lobbies" in
+  (* Use default 10 second timeout for list_lobbies *)
+  match Network.HttpClient.get ~env ~timeout:10.0 url with
   | Ok (`Lobbies lobbies) ->
     (match lobbies with
      | [] -> print_endline "No lobbies available."
@@ -104,43 +75,73 @@ let list_lobbies () =
        print_endline "Available Lobbies:";
        List.iter
          (fun (lobby : Game.WireFormat.lobby_info) ->
-           Printf.printf
-             "Game %d: %d/%d players (%s)\n"
-             lobby.game_id
-             lobby.current_players
-             lobby.max_players
-             lobby.config_preview)
+            Printf.printf
+              "Game %d: %d/%d players (%s)\n"
+              lobby.game_id
+              lobby.current_players
+              lobby.max_players
+              lobby.config_preview)
          lobbies;
-       print_endline "\nUse: dune exec client -- join <game_id>");
-    Lwt.return_unit
-  | Ok (`HttpError msg) ->
-    Printf.printf "Server error: %s\n" msg;
-    Lwt.return_unit
-  | Ok _ ->
-    Printf.printf "Unexpected response type\n";
-    Lwt.return_unit
+       print_endline "\nUse: dune exec client -- join <game_id>")
+  | Ok (`HttpError msg) -> Printf.printf "Server error: %s\n" msg
+  | Ok _ -> Printf.printf "Unexpected response type\n"
   | Error err ->
-    Printf.printf "Error fetching lobbies: %s\n" (Http.Raw_client.show_error err);
-    Lwt.return_unit
+    Printf.printf "Error fetching lobbies: %s\n" (Httpc.Raw_client.show_error err)
 ;;
 
-let join_game terminal game_id =
-  let open Network in
-  let uri = Uri.of_string (Config.server_url ^ "/join/" ^ Int.to_string game_id) in
-  let%lwt conn = WsClient.connect uri in
-  let%lwt mandated_join_message = WsClient.receive_one conn in
-  (match mandated_join_message with
-   | `Joined _assigned_client_id -> ()
-   | `Rejected reason ->
-     print_endline ("Joining game failed: " ^ reason);
-     exit 0
-   | _ -> failwith "First websocket message from server should be 'Joined' or 'Rejected'");
-  let send_player_input = send_player_input terminal in
-  let receive = receive terminal in
-  WsClient.duplex conn receive send_player_input
+(* Runs the TUI: one fiber renders whatever the server sends, the other
+   forwards key presses. Whichever finishes first (game over / disconnect /
+   escape) wins and tears the terminal down cleanly via the switch. *)
+let run_game_ui ~env conn =
+  let events = Eio.Stream.create 64 in
+  let outcome =
+    Notty_eio.Term.run
+      ~input:(Eio.Stdenv.stdin env)
+      ~output:(Eio.Stdenv.stdout env)
+      ~on_event:(fun event -> Eio.Stream.add events event)
+      (fun terminal ->
+         let rec server_loop () =
+           match Network.WsClient.receive_one conn with
+           | `Update updated_game ->
+             render_relative terminal updated_game;
+             server_loop ()
+           | `GameOver character -> `Winner character
+           | `Rejected reason -> `Error reason
+           | `Misc _ -> server_loop ()
+           | `Joined _ -> `Error "'Joined' should only be received once"
+           | exception End_of_file -> `Disconnected
+         in
+         let rec input_loop () =
+           match Eio.Stream.take events with
+           | `Key (`Arrow move, []) ->
+             Network.WsClient.send_one conn (`Move move);
+             input_loop ()
+           | `Key (`Escape, []) ->
+             Network.WsClient.close conn;
+             `Quit
+           | _ -> input_loop ()
+         in
+         Fiber.first server_loop input_loop)
+  in
+  (* The terminal is restored here; safe to print. *)
+  match outcome with
+  | `Winner character ->
+    print_endline (Message.string_of_character_type character ^ " won!")
+  | `Quit -> ()
+  | `Disconnected -> print_endline "Disconnected from server."
+  | `Error reason -> failwith reason
 ;;
 
-let offline_game terminal config =
+let join_game ~env ~sw ~server_url game_id =
+  let uri = Uri.of_string (server_url ^ "/join/" ^ Int.to_string game_id) in
+  let conn = Network.WsClient.connect ~sw ~env uri in
+  match Network.WsClient.receive_one conn with
+  | `Joined _assigned_client_id -> run_game_ui ~env conn
+  | `Rejected reason -> print_endline ("Joining game failed: " ^ reason)
+  | _ -> failwith "First websocket message from server should be 'Joined' or 'Rejected'"
+;;
+
+let offline_game ~env config =
   let game_update_message player_id game =
     let entities = Game.visible_map_relative player_id game in
     Game.WireFormat.wire_format ~game_id:game.game_id ~entities
@@ -150,26 +151,32 @@ let offline_game terminal config =
     let game_with_player = Game.add_entity base_game Game.default_entity |> snd in
     ref @@ Effects.(apply Start.effects game_with_player)
   in
-  let handle_input game = function
-    | Some (`Move move) ->
-      let walls =
-        Game.gather_positions
-          ~p:(fun e -> e = `Environment `Wall || e = `Environment `Glass)
-          ~entities:!game.Game.entities
-      in
-      Game.move ~walls ~game:!game ~entity_id:0 ~move
-      |> Option.iter (fun ngame -> game := ngame);
-      (game := Effects.(apply Tick.effects !game));
-      render_relative terminal (game_update_message 0 !game)
-    | Some `Close -> exit 1
-    | _ -> Lwt.return_unit
-  in
   let game = initialize_game config in
-  Lwt_stream.map_s
-    (function
-      | `Key (`Arrow move, []) -> Lwt.return @@ Some (`Move move)
-      | `Key (`Escape, []) -> Lwt.return @@ Some `Close
-      | _ -> Lwt.return @@ None)
-    (Term.events terminal)
-  |> Lwt_stream.iter_s (handle_input game)
+  let events = Eio.Stream.create 64 in
+  Notty_eio.Term.run
+    ~input:(Eio.Stdenv.stdin env)
+    ~output:(Eio.Stdenv.stdout env)
+    ~on_event:(fun event -> Eio.Stream.add events event)
+    (fun terminal ->
+       render_relative terminal (game_update_message 0 !game);
+       let handle_move move =
+         let walls =
+           Game.gather_positions
+             ~p:(fun e -> e = `Environment `Wall || e = `Environment `Glass)
+             ~entities:!game.Game.entities
+         in
+         Game.move ~walls ~game:!game ~entity_id:0 ~move
+         |> Option.iter (fun ngame -> game := ngame);
+         (game := Effects.(apply Tick.effects !game));
+         render_relative terminal (game_update_message 0 !game)
+       in
+       let rec loop () =
+         match Eio.Stream.take events with
+         | `Key (`Arrow move, []) ->
+           handle_move move;
+           loop ()
+         | `Key (`Escape, []) -> ()
+         | _ -> loop ()
+       in
+       loop ())
 ;;

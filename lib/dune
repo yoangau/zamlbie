@@ -46,6 +46,7 @@
   effects
   server
   network
+  notty_eio
   client
   client_arg
   config
@@ -63,16 +64,22 @@
   uuid)
  (libraries
   ws
-  http
+  httpc
   cmdliner
-  websocket
-  websocket-lwt-unix
   base
   notty
   notty.unix
-  notty.lwt
-  lwt.unix
-  dream
-  atdgen)
- (preprocess
-  (pps lwt_ppx)))
+  eio
+  eio.unix
+  eio_main
+  httpun
+  httpun-eio
+  httpun-ws
+  gluten
+  digestif
+  bigstringaf
+  cstruct
+  unix
+  atdgen-runtime
+  uri
+  yojson))

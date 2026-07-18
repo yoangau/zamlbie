@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+_build/
+_opam/
+*.install
+*.byte
+*.native
+*.annot
+*.cmo
+*.cma
+*.cmi
+*.a
+*.o
+*.cmx
+*.cmxs
+*.cmxa
+
+# IDE and editor files
+.vscode
+.merlin
+*.swp
+*.swo
+*~
+
+# Documentation and images (not needed for runtime)
+img/
+*.md
+LICENSE
+
+# Test files
+test/
+
+# OCaml build files
+setup.data
+setup.log
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Misc
+.DS_Store

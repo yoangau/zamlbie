@@ -7,22 +7,14 @@ module type Serializer = sig
 end
 
 module Make (S : Serializer) = struct
-  type t = unit
-
-  let request (url : string) (req : S.request option)
-    : (S.response, Raw_client.error) result Lwt.t
-    =
-    let open Lwt.Infix in
-    match req with
-    | None -> Raw_client.get url >|= Result.map S.deserialize_response
-    | Some req ->
-      let serialized = S.serialize_request req in
-      Raw_client.post url serialized >|= Result.map S.deserialize_response
+  let get ~env ?timeout (url : string) : (S.response, Raw_client.error) result =
+    Raw_client.get ~env ?timeout url |> Result.map S.deserialize_response
   ;;
 
-  let get (url : string) : (S.response, Raw_client.error) result Lwt.t = request url None
-
-  let post (url : string) (req : S.request) : (S.response, Raw_client.error) result Lwt.t =
-    request url (Some req)
+  let post ~env ?timeout (url : string) (req : S.request)
+    : (S.response, Raw_client.error) result
+    =
+    Raw_client.post ~env ?timeout url (S.serialize_request req)
+    |> Result.map S.deserialize_response
   ;;
 end

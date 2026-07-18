@@ -11,33 +11,13 @@ module Make (S : Serializer) = struct
 
   let connect = Raw_client.connect
 
-  let receive_one (client : t) : S.message_in Lwt.t =
-    let open Lwt.Infix in
-    Raw_client.receive_one client >|= S.deserialize
+  let receive_one (client : t) : S.message_in =
+    Raw_client.receive_one client |> S.deserialize
   ;;
 
-  let send_one (client : t) (message : S.message_out) : unit Lwt.t =
-    let serialized = S.serialize message in
-    Raw_client.send_one client serialized
+  let send_one (client : t) (message : S.message_out) : unit =
+    Raw_client.send_one client (S.serialize message)
   ;;
 
   let close = Raw_client.close
-
-  let duplex
-    (client : t)
-    (receive : S.message_in -> unit Lwt.t)
-    (send : unit -> [> `Close | `Message of S.message_out ] option Lwt_stream.t)
-    : unit Lwt.t
-    =
-    let wrapped_send () =
-      Lwt_stream.map
-        (function
-          | Some `Close -> Some `Close
-          | Some (`Message msg) -> Some (`Message (S.serialize msg))
-          | None -> None)
-        (send ())
-    in
-    let wrapped_receive msg = receive (S.deserialize msg) in
-    Raw_client.duplex client wrapped_receive wrapped_send
-  ;;
 end

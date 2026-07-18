@@ -1,6 +1,16 @@
 (library
  (name ws)
- (modules client raw_client)
- (libraries websocket-lwt-unix lwt.unix dream)
- (preprocess
-  (pps lwt_ppx)))
+ (modules client raw_client frames gluten_eio_flow)
+ (libraries
+  net_support
+  eio
+  eio.unix
+  gluten
+  httpun
+  httpun-ws
+  faraday
+  cstruct
+  bigstringaf
+  digestif
+  tls-eio
+  uri))

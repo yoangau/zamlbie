@@ -6,6 +6,11 @@ type command =
   | Test of Game.WireFormat.config
   | List
 
+type parsed_args =
+  { command : command;
+    server_url : string option
+  }
+
 let game_config_term =
   let open Game.WireFormat in
   let mk_config
@@ -129,6 +134,16 @@ let game_config_term =
     $ window_probability)
 ;;
 
+let server_url_term =
+  Arg.(
+    value
+    & opt (some string) None
+    & info
+        [ "u"; "server-url" ]
+        ~docv:"URL"
+        ~doc:"Server URL (default: ZAMLBIE_SERVER_URL env var or http://127.0.0.1:7777)")
+;;
+
 let join_term =
   let game_id =
     Arg.(
@@ -136,12 +151,24 @@ let join_term =
       & pos 0 (some int) None
       & info [] ~docv:"GAME_ID" ~doc:"Join a game with the specified ID")
   in
-  Term.(const (fun id -> Join id) $ game_id)
+  Term.(const (fun server_url id -> { command = Join id; server_url }) $ server_url_term $ game_id)
 ;;
 
-let create_term = Term.(const (fun config -> Create config) $ game_config_term)
-let test_term = Term.(const (fun config -> Test config) $ game_config_term)
-let list_term = Term.(const List)
+let create_term =
+  Term.(
+    const (fun server_url config -> { command = Create config; server_url })
+    $ server_url_term
+    $ game_config_term)
+;;
+
+let test_term =
+  Term.(
+    const (fun server_url config -> { command = Test config; server_url })
+    $ server_url_term
+    $ game_config_term)
+;;
+
+let list_term = Term.(const (fun server_url -> { command = List; server_url }) $ server_url_term)
 
 let join_cmd =
   let info = Cmd.info "join" ~doc:"Join a game by ID" in
@@ -168,9 +195,9 @@ let main_cmd =
   Cmd.group info [ join_cmd; create_cmd; test_cmd; list_cmd ]
 ;;
 
-let parse_args () =
+let parse_args () : parsed_args =
   match Cmd.eval_value main_cmd with
-  | Ok (`Ok cmd) -> cmd
+  | Ok (`Ok args) -> args
   | Ok `Version | Ok `Help -> exit 0
   | Error _ -> exit 1
 ;;

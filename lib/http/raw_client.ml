@@ -11,36 +11,56 @@ let show_error = function
     Format.sprintf "Unexpected response (%d): %s\n" code message
 ;;
 
-let post url body =
-  let open Lwt.Infix in
-  let open Cohttp in
-  let headers = Header.init_with "Content-Type" "application/json" in
-  let body = Cohttp_lwt.Body.of_string body in
-  let handle_response (resp, body) =
-    let status_code = Response.status resp |> Code.code_of_status in
-    Cohttp_lwt.Body.to_string body
-    >|= fun body_string ->
-    match status_code with
-    | 200 | 201 -> Ok body_string
-    | code when code >= 400 && code < 500 -> Error (`ClientError (code, body_string))
-    | code when code >= 500 -> Error (`ServerError (code, body_string))
-    | _ -> Error (`UnexpectedError (status_code, body_string))
+let make_client env =
+  let https =
+    match Net_support.tls_client_config () with
+    | Error _ -> None
+    | Ok config ->
+      Some
+        (fun uri raw ->
+          let host = Option.bind (Uri.host uri) Net_support.host_of_string in
+          Tls_eio.client_of_flow config ?host raw)
   in
-  Cohttp_lwt_unix.Client.post ~headers ~body (Uri.of_string url) >>= handle_response
+  Cohttp_eio.Client.make ~https (Eio.Stdenv.net env)
 ;;
 
-let get url =
-  let open Lwt.Infix in
-  let open Cohttp in
-  let handle_response (resp, body) =
-    let status_code = Response.status resp |> Code.code_of_status in
-    Cohttp_lwt.Body.to_string body
-    >|= fun body_string ->
-    match status_code with
-    | 200 | 201 -> Ok body_string
-    | code when code >= 400 && code < 500 -> Error (`ClientError (code, body_string))
-    | code when code >= 500 -> Error (`ServerError (code, body_string))
-    | _ -> Error (`UnexpectedError (status_code, body_string))
+let max_response_size = 16 * 1024 * 1024
+
+let classify_response status body_string =
+  match status with
+  | 200 | 201 -> Ok body_string
+  | code when code >= 400 && code < 500 -> Error (`ClientError (code, body_string))
+  | code when code >= 500 -> Error (`ServerError (code, body_string))
+  | code -> Error (`UnexpectedError (code, body_string))
+;;
+
+let request ~env ~timeout url perform =
+  let clock = Eio.Stdenv.clock env in
+  let result =
+    Eio.Time.with_timeout clock timeout (fun () ->
+      try
+        Eio.Switch.run (fun sw ->
+          let client = make_client env in
+          let response, body = perform client ~sw (Uri.of_string url) in
+          let status = Http.Status.to_int (Http.Response.status response) in
+          let body_string =
+            Eio.Buf_read.(parse_exn take_all) body ~max_size:max_response_size
+          in
+          Ok (classify_response status body_string))
+      with
+      | exn -> Ok (Error (`UnexpectedError (0, Printexc.to_string exn))))
   in
-  Cohttp_lwt_unix.Client.get (Uri.of_string url) >>= handle_response
+  match result with
+  | Ok outcome -> outcome
+  | Error `Timeout -> Error (`ClientError (408, "Request timed out"))
+;;
+
+let post ~env ?(timeout = 30.0) url body =
+  let headers = Http.Header.init_with "Content-Type" "application/json" in
+  request ~env ~timeout url (fun client ~sw uri ->
+    Cohttp_eio.Client.post ~headers ~body:(Cohttp_eio.Body.of_string body) client ~sw uri)
+;;
+
+let get ~env ?(timeout = 10.0) url =
+  request ~env ~timeout url (fun client ~sw uri -> Cohttp_eio.Client.get client ~sw uri)
 ;;

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: zamlbie-server
+    runtime: docker
+    repo: https://github.com/DIGarnier/zamlbie
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ZAMLBIE_SERVER_INTERFACE
+        value: 0.0.0.0
+    # Render.com automatically sets PORT environment variable
+    # The server will read from PORT, then ZAMLBIE_SERVER_PORT, then default to 7777
+    # No additional port configuration needed!
+

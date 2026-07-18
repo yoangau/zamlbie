@@ -26,13 +26,29 @@
   cmdliner
   notty
   base
-  dream
-  websocket
-  websocket-lwt-unix
-  cohttp-lwt-unix
+  (eio
+   (>= 1.0))
+  eio_main
+  httpun
+  httpun-eio
+  httpun-ws
+  gluten
+  faraday
+  bigstringaf
+  cstruct
+  digestif
+  (cohttp-eio
+   (>= 6.0.0))
+  http
+  tls-eio
+  ca-certs
+  mirage-crypto-rng
+  domain-name
+  x509
+  uri
   atdgen
-  lwt
-  lwt_ppx)
+  atdgen-runtime
+  yojson)
  (tags (gamedev)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
